@@ -65,7 +65,7 @@
    lmdb-dir
    (lambda (env txn)
      (let ((dbi (mdb:dbi-open txn #f 0))
-           (lines (read-separated-lines geno-file)))
+           (lines (read-separated-lines geno.txt-file)))
        (let rec ((lines lines))
          (unless (null-list? lines)
              (mdb:put txn dbi
@@ -77,7 +77,9 @@
                                       (* (length values)
                                          (sizeof float))))
                       mdb:+noodupdata+)
-           (rec (cdr lines))))))))
+           (rec (cdr lines))))
+       (list (length (first lines))
+             (map first lines))))))
 
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/geno-mouse-lmdb/")
 
@@ -132,25 +134,40 @@
                         (sqrt var)))))
      vec)))
 
-(define (read-geno.txt file)
-  (let* ((lines (read-separated-lines file))
-         (mtx (mtx-alloc (length lines) (- (length (first lines)) 3))))
-    (let rec ((line-idx 0))
-      (let ((line (list-ref lines line-idx)))
-        (let* ((numbers (list->vector (map string->num/nan (cdddr line))))
-               (vec (vec-alloc (vector-length numbers) numbers)))
-          (cleanup-vec vec)
-          (vec->mtx-row! vec mtx line-idx))))
-    (list (map first lines) mtx)))
+(define (read-genotypes geno.txt lmdb-dir markers individuals)
+  (let* ((lines (read-separated-lines geno.txt))
+         (mtx (mtx-alloc (length markers) individuals))
+         (line-idx 0))
+    (mdb:call-with-env-and-txn
+     lmdb-dir
+     (lambda (env txn)
+       (let ((dbi (mdb:dbi-open txn #f 0)))
+         (mdb:call-with-cursor
+          txn dbi
+          (lambda (cursor)
+            (mdb:for-cursor
+             cursor
+             (lambda (key data)
+               (let* ((numbers (mdb:val-data-parse
+                                data (make-list (/ (mdb:val-size data)
+                                                   (sizeof float)) float)))
+                      (vec (vec-alloc (length numbers) numbers)))
+                 (cleanup-vec vec)
+                 (vec->mtx-row! vec mtx line-idx)
+                 (set! line-idx (+ 1 line-idx))))))))))
+    mtx))
 
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
 
-(define (kinship file)
-  (let* ((mtx (second (read-geno.txt file)))
-         (result (mtx-alloc (mtx-rows mtx) (mtx-rows mtx) 0)))
+(define (kinship file lmdb-dir)
+  (let* ((meta (geno.txt->lmdb file lmdb-dir))
+         (mtx (read-genotypes file lmdb-dir (length (second meta)) (first meta)))
+         (result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-b +trans+)
     result))
+
+;; (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/")
 
 
 
