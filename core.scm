@@ -4,8 +4,12 @@
   #:use-module (ice-9 rdelim)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-43)
-  #:use-module (gemma matrix)
-  #:use-module (gemma vector))
+  #:use-module (gsl matrices)
+  #:use-module (gsl vectors)
+  #:use-module (gsl blas)
+  #:use-module (system foreign)
+  #:use-module (rnrs bytevectors)
+  #:use-module ((lmdb lmdb) #:prefix mdb:))
 
 (define (read-separated-lines file)
   (call-with-port (open-input-file file)
@@ -56,40 +60,97 @@
 
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
 
+(define (geno.txt->lmdb geno.txt-file lmdb-dir)
+  (mdb:call-with-env-and-txn
+   lmdb-dir
+   (lambda (env txn)
+     (let ((dbi (mdb:dbi-open txn #f 0))
+           (lines (read-separated-lines geno-file)))
+       (let rec ((lines lines))
+         (unless (null-list? lines)
+             (mdb:put txn dbi
+                      (mdb:make-val (first (first lines)))
+                      (let ((values (cdddr (first lines))))
+                        (mdb:make-val (make-c-struct
+                                       (make-list (length values) float)
+                                       (map string->num/nan values))
+                                      (* (length values)
+                                         (sizeof float))))
+                      mdb:+noodupdata+)
+           (rec (cdr lines))))))))
+
+;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/geno-mouse-lmdb/")
+
+(define (vec-mean vec)
+  (let ((sum 0)
+        (nans 0))
+    (for-vec
+     (lambda (index value)
+       (if (nan? value)
+           (set! nans (+ 1 nans))
+           (set! sum (+ sum value))))
+     vec)
+    (if (= nans (vec-length vec))
+        0
+        (/ sum
+           (- (vec-length vec) nans)))))
+
+(define (vec-replace-nan vec val)
+  (for-vec
+   (lambda (index value)
+     (when (nan? value)
+       (vec-set! vec index val)))
+   vec))
+
+(define-public (vec-variance vec)
+  (let ((mean (vec-mean vec))
+        (expt-sum 0))
+    (for-vec
+     (lambda (idx val)
+       (set! expt-sum (+ expt-sum (expt (- val mean) 2))))
+     vec)
+    (/ expt-sum
+       (- (vec-length vec) 1))))
+
+(define (cleanup-vec vec)
+  (let ((mean (vec-mean vec))
+        (var (vec-variance vec)))
+    ;; Replace NaNs with mean value.
+    (vec-replace-nan vec mean)
+    ;; Subtract mean from all the values, "center" them.
+    (for-vec
+     (lambda (idx val)
+       (vec-set! vec idx (- val mean)))
+     vec)
+    ;; ???
+    (for-vec
+     (lambda (idx val)
+       (vec-set! vec idx
+                 (/ val
+                    (if (= var 0.0)
+                        1
+                        (sqrt var)))))
+     vec)))
+
 (define (read-geno.txt file)
-  (let ((lines (read-separated-lines file)))
-    (map (lambda (line)
-           (let* ((numbers (list->vector (map string->num/nan (cdddr line))))
-                  (mean (vector-mean numbers))
-                  (un-nan (vector-replace-nan numbers mean)))
-             (list (first line)
-                   (second line)
-                   (third line)
-                   un-nan)))
-         lines)))
+  (let* ((lines (read-separated-lines file))
+         (mtx (mtx-alloc (length lines) (- (length (first lines)) 3))))
+    (let rec ((line-idx 0))
+      (let ((line (list-ref lines line-idx)))
+        (let* ((numbers (list->vector (map string->num/nan (cdddr line))))
+               (vec (vec-alloc (vector-length numbers) numbers)))
+          (cleanup-vec vec)
+          (vec->mtx-row! vec mtx line-idx))))
+    (list (map first lines) mtx)))
 
-;; (first (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
+;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
 
-(define (kinship genotypes)
-  (let ((cleaned-up (vector-map
-                     (lambda (i gs)
-                       (let* ((mean (vector-mean gs))
-                              (un-nan (vector-replace-nan gs mean))
-                              (centered (vector-map (lambda (i elem)
-                                                      (- elem mean))
-                                                    un-nan))
-                              (var (vector-variance centered)))
-                         (vector-map (lambda (i elem)
-                                       (/ elem
-                                          (if (= var 0)
-                                              1
-                                              (sqrt var))))
-                                     centered)))
-                     genotypes)))
-    (matrix-multiply (matrix-transpose cleaned-up)
-                     cleaned-up)))
-
-;; (vector-ref (kinship (list->vector (map fourth (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt")))) 0)
+(define (kinship file)
+  (let* ((mtx (second (read-geno.txt file)))
+         (result (mtx-alloc (mtx-rows mtx) (mtx-rows mtx) 0)))
+    (dgemm! mtx mtx result #:beta 0 #:transpose-b +trans+)
+    result))
 
 
 
