@@ -1,6 +1,7 @@
 (define-module (gemma core)
   #:use-module (ice-9 ports)
   #:use-module (ice-9 textual-ports)
+  #:use-module (ice-9 rdelim)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-43)
   #:use-module (gemma matrix)
@@ -9,14 +10,14 @@
 (define (read-separated-lines file)
   (call-with-port (open-input-file file)
     (lambda (port)
-      (let read-lines ((line (get-line port)))
+      (let read-lines ((line (first (%read-line port))))
         (if (eof-object? line)
             '()
             (cons (remove (lambda (s)
-                            (zero? (string-length s)))
+                            (equal? "" s))
                           (string-split
-                           line (lambda (c) (memv c '(#\Tab #\Space #\,)))))
-                  (read-lines (get-line port))))))))
+                           line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
+                  (read-lines (first (%read-line port)))))))))
 
 ;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
 
