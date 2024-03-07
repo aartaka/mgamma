@@ -61,25 +61,25 @@
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
 
 (define (geno.txt->lmdb geno.txt-file lmdb-dir)
-  (mdb:call-with-env-and-txn
-   lmdb-dir
-   (lambda (env txn)
-     (let ((dbi (mdb:dbi-open txn #f 0))
-           (lines (read-separated-lines geno.txt-file)))
-       (let rec ((lines lines))
-         (unless (null-list? lines)
-             (mdb:put txn dbi
-                      (mdb:make-val (first (first lines)))
-                      (let ((values (cdddr (first lines))))
-                        (mdb:make-val (make-c-struct
-                                       (make-list (length values) float)
-                                       (map string->num/nan values))
-                                      (* (length values)
-                                         (sizeof float))))
-                      mdb:+noodupdata+)
-           (rec (cdr lines))))
-       (list (length (first lines))
-             (map first lines))))))
+  (mdb:with-env-and-txn
+   (lmdb-dir #:mapsize (* 40 10485760))
+   (env txn)
+   (let ((dbi (mdb:dbi-open txn #f 0))
+         (lines (read-separated-lines geno.txt-file)))
+     (let rec ((lines lines))
+       (unless (null-list? lines)
+         (mdb:put txn dbi
+                  (mdb:make-val (first (first lines)))
+                  (let ((values (cdddr (first lines))))
+                    (mdb:make-val (make-c-struct
+                                   (make-list (length values) float)
+                                   (map string->num/nan values))
+                                  (* (length values)
+                                     (sizeof float))))
+                  mdb:+noodupdata+)
+         (rec (cdr lines))))
+     (list (length (first lines))
+           (map first lines)))))
 
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/geno-mouse-lmdb/")
 
