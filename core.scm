@@ -78,7 +78,7 @@
                                      (sizeof float))))
                   mdb:+noodupdata+)
          (rec (cdr lines))))
-     (list (length (first lines))
+     (list (- (length (first lines)) 3)
            (map first lines)))))
 
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/geno-mouse-lmdb/")
