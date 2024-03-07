@@ -162,7 +162,7 @@
 
 (define (kinship file lmdb-dir)
   (let* ((meta (geno.txt->lmdb file lmdb-dir))
-         (mtx (read-genotypes file lmdb-dir (length (second meta)) (first meta)))
+         (mtx (read-genotypes file lmdb-dir (second meta) (first meta)))
          (result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-b +trans+)
     result))
