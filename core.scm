@@ -67,7 +67,7 @@
    (let ((dbi (mdb:dbi-open txn #f 0))
          (lines (read-separated-lines geno.txt-file)))
      (let rec ((lines lines))
-       (unless (null-list? lines)
+       (unless (null? lines)
          (mdb:put txn dbi
                   (mdb:make-val (first (first lines)))
                   (let ((values (cdddr (first lines))))
@@ -81,7 +81,7 @@
      (list (- (length (first lines)) 3)
            (map first lines)))))
 
-;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/geno-mouse-lmdb/")
+;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
 (define (vec-mean vec)
   (let ((sum 0)
@@ -114,44 +114,51 @@
     (/ expt-sum
        (- (vec-length vec) 1))))
 
+
+;;(vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
+
+;; Get the line/vector
+;; Find mean
+;; Find variance
+;; Plug mean in place of NA
+;; Subtract the mean
+;; Scale by 1/sqrt(geno_var)???
+;; Multiply the matrix
 (define (cleanup-vec vec)
   (let ((mean (vec-mean vec))
         (var (vec-variance vec)))
     ;; Replace NaNs with mean value.
     (vec-replace-nan vec mean)
     ;; Subtract mean from all the values, "center" them.
-    (for-vec
-     (lambda (idx val)
-       (vec-set! vec idx (- val mean)))
-     vec)
+    (vec-add-constant! vec (- mean))
     ;; ???
-    (for-vec
-     (lambda (idx val)
-       (vec-set! vec idx
-                 (/ val
-                    (if (= var 0.0)
+    (vec-scale! vec (if (= var 0.0)
                         1
-                        (sqrt var)))))
-     vec)))
+                        (/ 1 (sqrt var))))))
 
-(define (read-genotypes geno.txt lmdb-dir markers individuals)
-  (let* ((lines (read-separated-lines geno.txt))
-         (mtx (mtx-alloc (length markers) individuals))
+(define (read-genotypes lmdb-dir markers individuals)
+  (let* ((mtx (mtx-alloc (length markers) individuals))
          (line-idx 0))
     (mdb:call-with-env-and-txn
      lmdb-dir
      (lambda (env txn)
        (let ((dbi (mdb:dbi-open txn #f 0)))
-         (mdb:call-with-cursor
-          txn dbi
-          (lambda (cursor)
-            (mdb:for-cursor
-             cursor
-             (lambda (key data)
-               (let* ((numbers (mdb:val-data-parse
-                                data (make-list (/ (mdb:val-size data)
-                                                   (sizeof float)) float)))
-                      (vec (vec-alloc (length numbers) numbers)))
+         (mdb:with-cursor
+          txn dbi (cursor)
+          (mdb:for-cursor
+           cursor
+           (lambda (key data)
+             (let* ((numbers (mdb:val-data-parse
+                              data (make-list (/ (mdb:val-size data)
+                                                 (sizeof float)) float)))
+                    ;; It sometimes happen that LMDB table has one or
+                    ;; two corrupted rows. Ignore them
+                    (vec (if (every (lambda (c)
+                                      (not (eq? 'Cc (char-general-category c))))
+                                    (string->list (mdb:val-data-string key)))
+                             (vec-alloc (length numbers) numbers)
+                             #f)))
+               (when vec
                  (cleanup-vec vec)
                  (vec->mtx-row! vec mtx line-idx)
                  (set! line-idx (+ 1 line-idx))))))))))
@@ -162,12 +169,11 @@
 
 (define (kinship file lmdb-dir)
   (let* ((meta (geno.txt->lmdb file lmdb-dir))
-         (mtx (read-genotypes file lmdb-dir (second meta) (first meta)))
-         (result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx) 0)))
+         (mtx (read-genotypes lmdb-dir (second meta) (first meta)))
+         (result (mtx-alloc (mtx-rows mtx) (mtx-rows mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-b +trans+)
     result))
 
-;; (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/")
-
-
-
+;; (let ((meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/")))
+;;   (read-genotypes "/tmp/lmdb-bxd/" (second meta) (first meta)))
+(mtx-get (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/") 0 0)
