@@ -140,7 +140,7 @@
     ;;                     (/ 1 (sqrt var))))
     ))
 
-(define (read-genotypes lmdb-dir markers individuals)
+(define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   (let* ((mtx (mtx-alloc (length markers) individuals))
          (line-idx 0))
     (mdb:call-with-env-and-txn
@@ -157,9 +157,7 @@
                                                  (sizeof float)) float)))
                     ;; FIXME: It sometimes happen that LMDB table has
                     ;; one or two corrupted rows. Ignoring them here
-                    (vec (if (every (lambda (c)
-                                      (not (eq? 'Cc (char-general-category c))))
-                                    (string->list (mdb:val-data-string key)))
+                    (vec (if (member (mdb:val-data-string key) markers)
                              (vec-alloc (length numbers) numbers)
                              #f)))
                (when vec
@@ -171,15 +169,20 @@
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
 
-(define (kinship file lmdb-dir)
-  (let* ((meta (geno.txt->lmdb file lmdb-dir))
-         (mtx (read-genotypes lmdb-dir (second meta) (first meta)))
-         (result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx))))
+(define (kinship mtx)
+  (let ((result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx))))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
-    (mtx-scale! result (/ 1 (length (second meta))))
+    (mtx-scale! result (/ 1 (mtx-rows mtx)))
     result))
+(define (kmain file lmdb-dir)
+  (let* ((meta (geno.txt->lmdb file lmdb-dir))
+         (mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta))))
+    (kinship mtx)))
 
-;; (define kin (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/"))
+;; (define lmdb-dir "/tmp/lmdb-hs/")
+;; (define meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/lmdb-hs/"))
+;; (define mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta)))
+;; (define kin (kinship mtx))
 ;; (let ((vec (vec-alloc 198)))
 ;;   (mtx-row->vec! kin 0 vec)
 ;;   (vec->vector vec))
