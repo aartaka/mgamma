@@ -174,8 +174,9 @@
 (define (kinship file lmdb-dir)
   (let* ((meta (geno.txt->lmdb file lmdb-dir))
          (mtx (read-genotypes lmdb-dir (second meta) (first meta)))
-         (result (mtx-alloc (mtx-rows mtx) (mtx-rows mtx) 0)))
-    (dgemm! mtx mtx result #:beta 0 #:transpose-b +trans+)
+         (result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx))))
+    (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
+    (mtx-scale! result (/ 1 (length (second meta))))
     result))
 
 ;; (let ((meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/")))
