@@ -179,6 +179,7 @@
     (mtx-scale! result (/ 1 (length (second meta))))
     result))
 
-;; (let ((meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/")))
-;;   (read-genotypes "/tmp/lmdb-bxd/" (second meta) (first meta)))
-(mtx-get (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/") 0 0)
+;; (define kin (kinship "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/"))
+;; (let ((vec (vec-alloc 198)))
+;;   (mtx-row->vec! kin 0 vec)
+;;   (vec->vector vec))
