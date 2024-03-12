@@ -106,16 +106,19 @@
 
 (define-public (vec-variance vec)
   (let ((mean (vec-mean vec))
-        (expt-sum 0))
+        (expt-sum 0)
+        (nans 0))
     (for-vec
      (lambda (idx val)
-       (set! expt-sum (+ expt-sum (expt (- val mean) 2))))
+       (if (nan? val)
+           (set! nans (+ 1 nans))
+           (set! expt-sum (+ expt-sum (expt (- val mean) 2)))))
      vec)
     (/ expt-sum
-       (- (vec-length vec) 1))))
+       (- (vec-length vec) nans 1))))
 
 
-;;(vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
+;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
 
 ;; Get the line/vector
 ;; Find mean
