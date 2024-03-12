@@ -155,8 +155,8 @@
              (let* ((numbers (mdb:val-data-parse
                               data (make-list (/ (mdb:val-size data)
                                                  (sizeof float)) float)))
-                    ;; It sometimes happen that LMDB table has one or
-                    ;; two corrupted rows. Ignore them
+                    ;; FIXME: It sometimes happen that LMDB table has
+                    ;; one or two corrupted rows. Ignoring them here
                     (vec (if (every (lambda (c)
                                       (not (eq? 'Cc (char-general-category c))))
                                     (string->list (mdb:val-data-string key)))
