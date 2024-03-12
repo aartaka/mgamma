@@ -134,10 +134,11 @@
     (vec-replace-nan vec mean)
     ;; Subtract mean from all the values, "center" them.
     (vec-add-constant! vec (- mean))
-    ;; ???
-    (vec-scale! vec (if (= var 0.0)
-                        1
-                        (/ 1 (sqrt var))))))
+    ;; ??? -gk 2?
+    ;; (vec-scale! vec (if (= var 0.0)
+    ;;                     1
+    ;;                     (/ 1 (sqrt var))))
+    ))
 
 (define (read-genotypes lmdb-dir markers individuals)
   (let* ((mtx (mtx-alloc (length markers) individuals))
