@@ -4,8 +4,8 @@
   #:use-module (ice-9 rdelim)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-43)
-  #:use-module (gsl matrices)
-  #:use-module (gsl vectors)
+  #:use-module ((gsl matrices) #:prefix mtx:)
+  #:use-module ((gsl vectors) #:prefix vec:)
   #:use-module (gsl blas)
   #:use-module (system foreign)
   #:use-module (rnrs bytevectors)
@@ -110,36 +110,36 @@
 (define (vec-mean vec)
   (let ((sum 0)
         (nans 0))
-    (for-vec
+    (vec:for-vec
      (lambda (index value)
        (if (nan? value)
            (set! nans (+ 1 nans))
            (set! sum (+ sum value))))
      vec)
-    (if (= nans (vec-length vec))
+    (if (= nans (vec:length vec))
         0
         (/ sum
-           (- (vec-length vec) nans)))))
+           (- (vec:length vec) nans)))))
 
 (define (vec-replace-nan vec val)
-  (for-vec
+  (vec:for-vec
    (lambda (index value)
      (when (nan? value)
-       (vec-set! vec index val)))
+       (vec:set! vec index val)))
    vec))
 
 (define-public (vec-variance vec)
   (let ((mean (vec-mean vec))
         (expt-sum 0)
         (nans 0))
-    (for-vec
+    (vec:for-vec
      (lambda (idx val)
        (if (nan? val)
            (set! nans (+ 1 nans))
            (set! expt-sum (+ expt-sum (expt (- val mean) 2)))))
      vec)
     (/ expt-sum
-       (- (vec-length vec) nans 1))))
+       (- (vec:length vec) nans 1))))
 
 
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
@@ -157,7 +157,7 @@
     ;; Replace NaNs with mean value.
     (vec-replace-nan vec mean)
     ;; Subtract mean from all the values, "center" them.
-    (vec-add-constant! vec (- mean))
+    (vec:add-constant! vec (- mean))
     ;; ??? -gk 2?
     ;; (vec-scale! vec (if (= var 0.0)
     ;;                     1
@@ -165,7 +165,7 @@
     ))
 
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
-  (let* ((mtx (mtx-alloc (length markers) individuals))
+  (let* ((mtx (mtx:alloc (length markers) individuals))
          (line-idx 0))
     (mdb:call-with-env-and-txn
      lmdb-dir
@@ -182,11 +182,11 @@
                     ;; FIXME: It sometimes happen that LMDB table has
                     ;; one or two corrupted rows. Ignoring them here
                     (vec (if (member (mdb:val-data-string key) markers)
-                             (vec-alloc (length numbers) numbers)
+                             (vec:alloc (length numbers) numbers)
                              #f)))
                (when vec
                  (cleanup-vec vec)
-                 (vec->mtx-row! vec mtx line-idx)
+                 (mtx:vec->row! vec mtx line-idx)
                  (set! line-idx (+ 1 line-idx))))))))))
     mtx))
 
@@ -194,9 +194,9 @@
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
 
 (define (kinship mtx)
-  (let ((result (mtx-alloc (mtx-columns mtx) (mtx-columns mtx))))
+  (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx))))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
-    (mtx-scale! result (/ 1 (mtx-rows mtx)))
+    (mtx:scale! result (/ 1 (mtx:rows mtx)))
     result))
 (define (kmain file lmdb-dir)
   (let* ((meta (geno.txt->lmdb file lmdb-dir))
@@ -207,6 +207,6 @@
 ;; (define meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/lmdb-hs/"))
 ;; (define mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta)))
 ;; (define kin (kinship mtx))
-;; (let ((vec (vec-alloc 198)))
-;;   (mtx-row->vec! kin 0 vec)
-;;   (vec->vector vec))
+;; (let ((vec (vec:alloc 198)))
+;;   (mtx:row->vec! kin 0 vec)
+;;   (vec:->vector vec))
