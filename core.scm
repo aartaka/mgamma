@@ -12,6 +12,8 @@
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
 (define (read-separated-lines file)
+  "Read tab/space/comma-separated fields from FILE.
+Return a list of lists of values."
   (call-with-port (open-input-file file)
     (lambda (port)
       (let read-lines ((line (first (%read-line port))))
@@ -41,6 +43,7 @@
 ;; (read-bim "/home/aartaka/git/GEMMA/example/mouse_hs1940.bim")
 
 (define (string->num/nan str)
+  "Convert the string to a valid float of NaN."
   (if (string= "NA" str)
       +nan.0
       (string->number str)))
@@ -61,6 +64,9 @@
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
 
 (define (geno.txt-meta geno.txt-file)
+  "Return (INDIVIDUALS (MARKER ...)) metadata list for GENO.TXT-FILE.
+INDIVIDUALS is a number or individuals/columns in the dataset.
+MARKERs are string names for SNPs in the datasets."
   (call-with-port (open-input-file geno.txt-file)
     (lambda (port)
       (let* ((individuals #f)
@@ -141,17 +147,8 @@
     (/ expt-sum
        (- (vec:length vec) nans 1))))
 
-
-;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
-
-;; Get the line/vector
-;; Find mean
-;; Find variance
-;; Plug mean in place of NA
-;; Subtract the mean
-;; Scale by 1/sqrt(geno_var)???
-;; Multiply the matrix
 (define (cleanup-vec vec)
+  "Clean up the vector from NaNs and center it around the mean."
   (let ((mean (vec-mean vec))
         (var (vec-variance vec)))
     ;; Replace NaNs with mean value.
@@ -165,6 +162,8 @@
     ))
 
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
+  "Read the data from LMDB-DIR and convert it to GSL matrix.
+The resulting matrix is #MARKERSxINDIVIDUALS sized."
   (let* ((mtx (mtx:alloc (length markers) individuals))
          (line-idx 0))
     (mdb:call-with-env-and-txn
