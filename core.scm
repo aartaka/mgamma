@@ -139,23 +139,9 @@ The values are `float' arrays with one float value per individual."
        (vec:set! vec index val)))
    vec))
 
-(define-public (vec-variance vec)
-  (let ((mean (vec-mean vec))
-        (expt-sum 0)
-        (nans 0))
-    (vec:for-vec
-     (lambda (idx val)
-       (if (nan? val)
-           (set! nans (+ 1 nans))
-           (set! expt-sum (+ expt-sum (expt (- val mean) 2)))))
-     vec)
-    (/ expt-sum
-       (- (vec:length vec) nans 1))))
-
 (define (cleanup-vec vec)
   "Clean up the vector from NaNs and center it around the mean."
-  (let ((mean (vec-mean vec))
-        (var (vec-variance vec)))
+  (let ((mean (vec-mean vec)))
     ;; Replace NaNs with mean value.
     (vec-replace-nan vec mean)
     ;; Subtract mean from all the values, "center" them.
