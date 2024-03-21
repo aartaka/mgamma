@@ -91,25 +91,30 @@ MARKERs are string names for SNPs in the datasets."
         (list individuals markers)))))
 
 (define (geno.txt->lmdb geno.txt-file lmdb-dir)
-  (mdb:with-env-and-txn
-   (lmdb-dir #:mapsize (* 40 10485760))
-   (env txn)
-   (let ((dbi (mdb:dbi-open txn #f 0))
-         (lines (read-separated-lines geno.txt-file)))
-     (let rec ((lines lines))
-       (unless (null? lines)
-         (mdb:put txn dbi
-                  (mdb:make-val (first (first lines)))
-                  (let ((values (cdddr (first lines))))
-                    (mdb:make-val (make-c-struct
-                                   (make-list (length values) float)
-                                   (map string->num/nan values))
-                                  (* (length values)
-                                     (sizeof float))))
-                  mdb:+noodupdata+)
-         (rec (cdr lines))))
-     (list (- (length (first lines)) 3)
-           (map first lines)))))
+  "Convert GENO.TXT-FILE to a n LMDB-DIR-located database.
+Useful to speed up genotype matrix manipulation.
+The keys of the resulting DB are marker names.
+The values are `float' arrays with one float value per individual."
+  (mdb:call-with-env-and-txn
+   lmdb-dir
+   (lambda (env txn)
+     (let ((dbi (mdb:dbi-open txn #f 0))
+           (lines (read-separated-lines geno.txt-file)))
+       (let rec ((lines lines))
+         (unless (null? lines)
+           (mdb:put txn dbi
+                    (mdb:make-val (first (first lines)))
+                    (let ((values (cdddr (first lines))))
+                      (mdb:make-val (make-c-struct
+                                     (make-list (length values) float)
+                                     (map string->num/nan values))
+                                    (* (length values)
+                                       (sizeof float))))
+                    mdb:+noodupdata+)
+           (rec (cdr lines))))
+       (list (- (length (first lines)) 3)
+             (map first lines))))
+   #:mapsize (* 40 10485760)))
 
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
@@ -170,40 +175,57 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
      lmdb-dir
      (lambda (env txn)
        (let ((dbi (mdb:dbi-open txn #f 0)))
-         (mdb:with-cursor
-          txn dbi (cursor)
-          (mdb:for-cursor
-           cursor
-           (lambda (key data)
-             (let* ((numbers (mdb:val-data-parse
-                              data (make-list (/ (mdb:val-size data)
-                                                 (sizeof float)) float)))
-                    ;; FIXME: It sometimes happen that LMDB table has
-                    ;; one or two corrupted rows. Ignoring them here
-                    (vec (if (member (mdb:val-data-string key) markers)
-                             (vec:alloc (length numbers) numbers)
-                             #f)))
-               (when vec
-                 (cleanup-vec vec)
-                 (mtx:vec->row! vec mtx line-idx)
-                 (set! line-idx (+ 1 line-idx))))))))))
+         (mdb:call-with-cursor
+          txn dbi
+          (lambda (cursor)
+            (mdb:for-cursor
+             cursor
+             (lambda (key data)
+               ;; FIXME: It sometimes happens that LMDB table has one
+               ;; or two corrupted rows. Ignoring them here
+               (when (and (member (mdb:val-data-string key) markers)
+                          (not (string-any (lambda (c)
+                                             (eq? 'Cc (char-general-category c)))
+                                           (mdb:val-data-string key)))
+                          (< line-idx (length markers)))
+                 (let* ((vec (vec:alloc individuals 0))
+                        (bv (pointer->bytevector
+                             (mdb:val-data data)
+                             (* (sizeof float) individuals))))
+                   (let rec ((idx 0))
+                     (when (< idx individuals)
+                       (vec:set!
+                        vec idx
+                        (bytevector-ieee-single-native-ref bv (* idx (sizeof float))))
+                       (rec (+ idx 1))))
+                   (cleanup-vec vec)
+                   (mtx:vec->row! vec mtx line-idx)
+                   (set! line-idx (+ 1 line-idx))))))))))
+     #:mapsize (* 40 10485760))
     mtx))
 
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
 ;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
 
 (define (kinship mtx)
+  "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx))))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
     (mtx:scale! result (/ 1 (mtx:rows mtx)))
     result))
 (define (kmain file lmdb-dir)
-  (let* ((meta (geno.txt->lmdb file lmdb-dir))
+  (let* ((meta (if (and (file-exists? lmdb-dir)
+                        (file-exists? (string-append "data.mdb")))
+                   (geno.txt-meta file)
+                   (geno.txt->lmdb file lmdb-dir)))
          (mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta))))
     (kinship mtx)))
 
+;; (define kin (kmain "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/lmdb-bxd/"))
 ;; (define lmdb-dir "/tmp/lmdb-hs/")
-;; (define meta (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/lmdb-hs/"))
+;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/tmp/lmdb-hs/")
+;;(define meta (geno.txt-meta "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+;; (define mtx (lmdb->genotypes-mtx "/tmp/lmdb-bxd/" (second meta) (first meta)))
 ;; (define mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta)))
 ;; (define kin (kinship mtx))
 ;; (let ((vec (vec:alloc 198)))
