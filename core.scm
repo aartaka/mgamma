@@ -98,20 +98,29 @@ The values are `float' arrays with one float value per individual."
   (mdb:call-with-env-and-txn
    lmdb-dir
    (lambda (env txn)
-     (let ((dbi (mdb:dbi-open txn #f 0))
-           (lines (read-separated-lines geno.txt-file)))
-       (let rec ((lines lines))
-         (unless (null? lines)
-           (mdb:put txn dbi
-                    (mdb:make-val (first (first lines)))
-                    (let ((values (cdddr (first lines))))
-                      (mdb:make-val (make-c-struct
-                                     (make-list (length values) float)
-                                     (map string->num/nan values))
-                                    (* (length values)
-                                       (sizeof float))))
-                    mdb:+noodupdata+)
-           (rec (cdr lines))))
+     (let* ((dbi (mdb:dbi-open txn #f 0))
+            (lines (read-separated-lines geno.txt-file))
+            (cursor (mdb:cursor-open txn dbi)))
+       (with-exception-handler
+           ;; Weird logic, but here we are: if there's a
+           ;; "no-key-found" exception on CURSOR, fill the DB.
+           (lambda (exc)
+             (format #t "Keys not found, filling the database at ~s." lmdb-dir)
+             (let rec ((lines lines))
+               (unless (null? lines)
+                 (mdb:put txn dbi
+                          (mdb:make-val (first (first lines)))
+                          (let ((values (cdddr (first lines))))
+                            (mdb:make-val (make-c-struct
+                                           (make-list (length values) float)
+                                           (map string->num/nan values))
+                                          (* (length values)
+                                             (sizeof float))))
+                          mdb:+noodupdata+)
+                 (rec (cdr lines)))))
+         (lambda ()
+           (mdb:cursor-first cursor)))
+       (mdb:cursor-close cursor)
        (list (- (length (first lines)) 3)
              (map first lines))))
    #:mapsize (* 40 10485760)))
@@ -119,18 +128,8 @@ The values are `float' arrays with one float value per individual."
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
 (define (vec-mean vec)
-  (let ((sum 0)
-        (nans 0))
-    (vec:for-vec
-     (lambda (index value)
-       (if (nan? value)
-           (set! nans (+ 1 nans))
-           (set! sum (+ sum value))))
-     vec)
-    (if (= nans (vec:length vec))
-        0
-        (/ sum
-           (- (vec:length vec) nans)))))
+  (/ (vec:sum vec)
+     (vec:length vec)))
 
 (define (vec-replace-nan vec val)
   (vec:for-vec
@@ -143,13 +142,14 @@ The values are `float' arrays with one float value per individual."
   "Clean up the vector from NaNs and center it around the mean."
   (let ((mean (vec-mean vec)))
     ;; Replace NaNs with mean value.
-    (vec-replace-nan vec mean)
+    ;; (vec-replace-nan vec mean)
     ;; Subtract mean from all the values, "center" them.
-    (vec:add-constant! vec (- mean))
+    ;; (vec:add-constant! vec (- mean))
     ;; ??? -gk 2?
     ;; (vec-scale! vec (if (= var 0.0)
     ;;                     1
     ;;                     (/ 1 (sqrt var))))
+    #f
     ))
 
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
@@ -157,36 +157,34 @@ The values are `float' arrays with one float value per individual."
 The resulting matrix is #MARKERSxINDIVIDUALS sized."
   (let* ((mtx (mtx:alloc (length markers) individuals))
          (line-idx 0))
-    (mdb:call-with-env-and-txn
+    (mdb:call-with-wrapped-cursor
      lmdb-dir
-     (lambda (env txn)
-       (let ((dbi (mdb:dbi-open txn #f 0)))
-         (mdb:call-with-cursor
-          txn dbi
-          (lambda (cursor)
-            (mdb:for-cursor
-             cursor
-             (lambda (key data)
-               ;; FIXME: It sometimes happens that LMDB table has one
-               ;; or two corrupted rows. Ignoring them here
-               (when (and (member (mdb:val-data-string key) markers)
-                          (not (string-any (lambda (c)
-                                             (eq? 'Cc (char-general-category c)))
-                                           (mdb:val-data-string key)))
-                          (< line-idx (length markers)))
-                 (let* ((vec (vec:alloc individuals 0))
-                        (bv (pointer->bytevector
-                             (mdb:val-data data)
-                             (* (sizeof float) individuals))))
-                   (let rec ((idx 0))
-                     (when (< idx individuals)
-                       (vec:set!
-                        vec idx
-                        (bytevector-ieee-single-native-ref bv (* idx (sizeof float))))
-                       (rec (+ idx 1))))
-                   (cleanup-vec vec)
-                   (mtx:vec->row! vec mtx line-idx)
-                   (set! line-idx (+ 1 line-idx))))))))))
+     (lambda (env txn dbi cursor)
+       (mdb:for-cursor
+        cursor
+        (lambda (key data)
+          ;; FIXME: It sometimes happens that LMDB table has one
+          ;; or two corrupted rows. Ignoring them here
+          (when (and (member (mdb:val-data-string key) markers)
+                     (not (string-any (lambda (c)
+                                        (eq? 'Cc (char-general-category c)))
+                                      (mdb:val-data-string key))))
+            (let* ((vec (vec:alloc individuals 0))
+                   (bv (pointer->bytevector
+                        (mdb:val-data data)
+                        (* (sizeof float) individuals))))
+              (let rec ((idx 0))
+                (when (< idx individuals)
+                  (vec:set!
+                   vec idx
+                   (bytevector-ieee-single-native-ref bv (* idx (sizeof float))))
+                  (rec (+ idx 1))))
+              (let ((mean (vec-mean vec)))
+                (vec-replace-nan vec mean)
+                (vec:add-constant! vec (- mean)))
+              ;; (cleanup-vec vec)
+              (mtx:vec->row! vec mtx line-idx)
+              (set! line-idx (+ 1 line-idx)))))))
      #:mapsize (* 40 10485760))
     mtx))
 
