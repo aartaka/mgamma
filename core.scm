@@ -2,7 +2,9 @@
   #:use-module (ice-9 ports)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 rdelim)
+  #:use-module (ice-9 match)
   #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-26)
   #:use-module (srfi srfi-43)
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl vectors) #:prefix vec:)
@@ -137,6 +139,43 @@ The values are `float' arrays with one float value per individual."
      (when (nan? value)
        (vec:set! vec index val)))
    vec))
+
+(define (useful-individuals pheno.txt)
+  (let ((lines (read-separated-lines pheno.txt)))
+    (let rec ((idx 0))
+      (if (= idx (length lines))
+          '()
+          (cons (not (string=? "NA"
+                               (first (list-ref lines idx))))
+                (rec (+ 1 idx)))))))
+
+(define* (useful-snps geno.txt pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
+  (let ((lines (read-separated-lines geno.txt))
+        (useful-inds (useful-individuals pheno.txt))
+        (useful-snp-table (make-hash-table)))
+    (let snp-rec ((snp 0))
+      (when (< snp (length lines))
+        (match (list-ref lines snp)
+          ((name minor major . inds)
+           ;; TODO: covariates correlation, -r2, -hwe
+           (let* ((ind-count (length inds))
+                  (maf (let ind-rec ((ind 0)
+                                     (maf 0))
+                         (cond
+                          ((= ind ind-count)
+                           maf)
+                          ((not (list-ref useful-inds ind))
+                           (ind-rec (+ 1 ind) maf))
+                          (else
+                           (ind-rec (+ 1 ind)
+                                    (+ maf (string->number (list-ref inds ind))))))))
+                  (miss-count (count (cut string=? "NA" <>) inds))
+                  (maf (/ maf (* 2 (- ind-count miss-count)))))
+             (when (and (< (/ miss-count ind-count) miss-level)
+                        (< maf-level maf (- 1 maf-level)))
+               (hash-set! useful-snp-table name #t)))))
+        (snp-rec (+ 1 snp))))
+    useful-snp-table))
 
 (define (cleanup-vec vec)
   "Clean up the vector from NaNs and center it around the mean."
