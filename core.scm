@@ -65,33 +65,6 @@ Return a list of lists of values."
 
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
 
-(define (geno.txt-meta geno.txt-file)
-  "Return (INDIVIDUALS (MARKER ...)) metadata list for GENO.TXT-FILE.
-INDIVIDUALS is a number or individuals/columns in the dataset.
-MARKERs are string names for SNPs in the datasets."
-  (call-with-port (open-input-file geno.txt-file)
-    (lambda (port)
-      (let* ((individuals #f)
-             (markers
-              (let read-lines ((line (first (%read-line port))))
-                (if (eof-object? line)
-                    '()
-                    (begin
-                      (unless individuals
-                        (set! individuals
-                              (- (length
-                                  (remove (lambda (s)
-                                            (equal? "" s))
-                                          (string-split
-                                           line (lambda (c) (memq c '(#\Tab #\Space #\,))))))
-                                 3)))
-                      (cons (string-take
-                             line
-                             (string-index
-                              line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
-                            (read-lines (first (%read-line port)))))))))
-        (list individuals markers)))))
-
 (define (geno.txt->lmdb geno.txt-file lmdb-dir)
   "Convert GENO.TXT-FILE to a n LMDB-DIR-located database.
 Useful to speed up genotype matrix manipulation.
