@@ -205,7 +205,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
 
 (define (kinship mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
-  (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx))))
+  (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
     (mtx:scale! result (/ 1 n-useful-snps))
     result))
