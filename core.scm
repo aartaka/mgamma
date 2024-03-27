@@ -22,8 +22,7 @@ Return a list of lists of values."
       (let read-lines ((line (first (%read-line port))))
         (if (eof-object? line)
             '()
-            (cons (remove (lambda (s)
-                            (= 0 (string-length s)))
+            (cons (remove string-null?
                           (string-split
                            line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
                   (read-lines (first (%read-line port)))))))))
@@ -164,9 +163,8 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
           ;; FIXME: It sometimes happens that LMDB table has one
           ;; or two corrupted rows. Ignoring them here
           (when (and (member (mdb:val-data-string key) markers)
-                     (not (string-any (lambda (c)
-                                        (eq? 'Cc (char-general-category c)))
-                                      (mdb:val-data-string key))))
+                     (not (memq 'Cc (string-map char-general-category
+                                                (mdb:val-data-string key)))))
             (let* ((vec (vec:alloc individuals 0)))
               (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
               (let ((mean (vec-mean vec)))
