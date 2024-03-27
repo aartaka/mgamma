@@ -144,20 +144,6 @@ The values are `float' arrays with one float value per individual."
              (hash-set! useful-snp-table name #t))))))
     useful-snp-table))
 
-(define (cleanup-vec vec)
-  "Clean up the vector from NaNs and center it around the mean."
-  (let ((mean (vec-mean vec)))
-    ;; Replace NaNs with mean value.
-    ;; (vec-replace-nan vec mean)
-    ;; Subtract mean from all the values, "center" them.
-    ;; (vec:add-constant! vec (- mean))
-    ;; ??? -gk 2?
-    ;; (vec-scale! vec (if (= var 0.0)
-    ;;                     1
-    ;;                     (/ 1 (sqrt var))))
-    #f
-    ))
-
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   "Read the data from LMDB-DIR and convert it to GSL matrix.
 The resulting matrix is #MARKERSxINDIVIDUALS sized."
