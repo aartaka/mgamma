@@ -162,9 +162,9 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
         (lambda (key data)
           ;; FIXME: It sometimes happens that LMDB table has one
           ;; or two corrupted rows. Ignoring them here
-          (when (and (member (mdb:val-data-string key) markers)
-                     (not (memq 'Cc (string-map char-general-category
-                                                (mdb:val-data-string key)))))
+          (unless (string-any (lambda (c)
+                                (eq? 'Cc (char-general-category c)))
+                              (mdb:val-data-string key))
             (let* ((vec (vec:alloc individuals 0)))
               (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
               (let ((mean (vec-mean vec)))
