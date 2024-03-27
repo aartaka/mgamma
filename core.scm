@@ -23,7 +23,7 @@ Return a list of lists of values."
         (if (eof-object? line)
             '()
             (cons (remove (lambda (s)
-                            (equal? "" s))
+                            (= 0 (string-length s)))
                           (string-split
                            line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
                   (read-lines (first (%read-line port)))))))))
