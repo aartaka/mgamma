@@ -69,7 +69,7 @@ Return a list of lists of values."
   "Convert GENO.TXT-FILE to a n LMDB-DIR-located database.
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
-The values are `float' arrays with one float value per individual."
+The values are `double' arrays with one value per individual."
   (mdb:call-with-env-and-txn
    lmdb-dir
    (lambda (env txn)
@@ -87,10 +87,10 @@ The values are `float' arrays with one float value per individual."
                           (mdb:make-val (first (first lines)))
                           (let ((values (cdddr (first lines))))
                             (mdb:make-val (make-c-struct
-                                           (make-list (length values) float)
+                                           (make-list (length values) double)
                                            (map string->num/nan values))
                                           (* (length values)
-                                             (sizeof float))))
+                                             (sizeof double))))
                           mdb:+noodupdata+)
                  (rec (cdr lines)))))
          (lambda ()
@@ -164,7 +164,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
             (let* ((vec (vec:alloc individuals 0))
                    (bv (pointer->bytevector
                         (mdb:val-data data) (mdb:val-size data)))
-                   (actual-elements (/ (mdb:val-size data) (sizeof float))))
+                   (actual-elements (/ (mdb:val-size data) (sizeof double))))
               (unless (= actual-elements individuals)
                 (format #t "Actual elements (~d) are not equal with individuals (~d)~%"
                         actual-elements individuals))
@@ -172,7 +172,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
                   ((= idx actual-elements))
                 (vec:set!
                  vec idx
-                 (bytevector-ieee-single-native-ref bv (* idx (sizeof float)))))
+                 (bytevector-ieee-double-native-ref bv (* idx (sizeof double)))))
               (let ((mean (vec-mean vec)))
                 (vec-replace-nan vec mean)
                 (vec:add-constant! vec (- mean)))
