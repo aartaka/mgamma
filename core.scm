@@ -176,7 +176,6 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
               (let ((mean (vec-mean vec)))
                 (vec-replace-nan vec mean)
                 (vec:add-constant! vec (- mean)))
-              ;; (cleanup-vec vec)
               (mtx:vec->row! vec mtx line-idx)
               (set! line-idx (+ 1 line-idx)))))))
      #:mapsize (* 40 10485760))
