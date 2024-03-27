@@ -10,6 +10,7 @@
   #:use-module ((gsl vectors) #:prefix vec:)
   #:use-module (gsl blas)
   #:use-module (system foreign)
+  #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
@@ -143,6 +144,12 @@ The values are `double' arrays with one value per individual."
              (hash-set! useful-snp-table name #t))))))
     useful-snp-table))
 
+(define memcpy
+  (foreign-library-function
+   #f "memcpy"
+   #:return-type '*
+   #:arg-types (list '* '* size_t)))
+
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   "Read the data from LMDB-DIR and convert it to GSL matrix.
 The resulting matrix is #MARKERSxINDIVIDUALS sized."
@@ -160,18 +167,8 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
                      (not (string-any (lambda (c)
                                         (eq? 'Cc (char-general-category c)))
                                       (mdb:val-data-string key))))
-            (let* ((vec (vec:alloc individuals 0))
-                   (bv (pointer->bytevector
-                        (mdb:val-data data) (mdb:val-size data)))
-                   (actual-elements (/ (mdb:val-size data) (sizeof double))))
-              (unless (= actual-elements individuals)
-                (format #t "Actual elements (~d) are not equal with individuals (~d)~%"
-                        actual-elements individuals))
-              (do ((idx 0 (1+ idx)))
-                  ((= idx actual-elements))
-                (vec:set!
-                 vec idx
-                 (bytevector-ieee-double-native-ref bv (* idx (sizeof double)))))
+            (let* ((vec (vec:alloc individuals 0)))
+              (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
               (let ((mean (vec-mean vec)))
                 (vec-replace-nan vec mean)
                 (vec:add-constant! vec (- mean)))
