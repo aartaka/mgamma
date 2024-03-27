@@ -81,18 +81,17 @@ The values are `double' arrays with one value per individual."
            ;; "no-key-found" exception on CURSOR, fill the DB.
            (lambda (exc)
              (format #t "Keys not found, filling the database at ~s." lmdb-dir)
-             (let rec ((lines lines))
-               (unless (null? lines)
-                 (mdb:put txn dbi
-                          (mdb:make-val (first (first lines)))
-                          (let ((values (cdddr (first lines))))
-                            (mdb:make-val (make-c-struct
-                                           (make-list (length values) double)
-                                           (map string->num/nan values))
-                                          (* (length values)
-                                             (sizeof double))))
-                          mdb:+noodupdata+)
-                 (rec (cdr lines)))))
+             (do ((lines lines (cdr lines)))
+                 ((null? lines))
+               (mdb:put txn dbi
+                        (mdb:make-val (first (first lines)))
+                        (let ((values (cdddr (first lines))))
+                          (mdb:make-val (make-c-struct
+                                         (make-list (length values) double)
+                                         (map string->num/nan values))
+                                        (* (length values)
+                                           (sizeof double))))
+                        mdb:+noodupdata+)))
          (lambda ()
            (mdb:cursor-first cursor)))
        (mdb:cursor-close cursor)
