@@ -126,28 +126,22 @@ The values are `float' arrays with one float value per individual."
   (let ((lines (read-separated-lines geno.txt))
         (useful-inds (useful-individuals pheno.txt))
         (useful-snp-table (make-hash-table)))
-    (let snp-rec ((snp 0))
-      (when (< snp (length lines))
-        (match (list-ref lines snp)
-          ((name minor major . inds)
-           ;; TODO: covariates correlation, -r2, -hwe
-           (let* ((ind-count (length inds))
-                  (maf (let ind-rec ((ind 0)
-                                     (maf 0))
-                         (cond
-                          ((= ind ind-count)
-                           maf)
-                          ((not (list-ref useful-inds ind))
-                           (ind-rec (+ 1 ind) maf))
-                          (else
-                           (ind-rec (+ 1 ind)
-                                    (+ maf (string->number (list-ref inds ind))))))))
-                  (miss-count (count (cut string=? "NA" <>) inds))
-                  (maf (/ maf (* 2 (- ind-count miss-count)))))
-             (when (and (< (/ miss-count ind-count) miss-level)
-                        (< maf-level maf (- 1 maf-level)))
-               (hash-set! useful-snp-table name #t)))))
-        (snp-rec (+ 1 snp))))
+    (do ((snp 0 (1+ snp)))
+        ((= snp (length lines)))
+      (match (list-ref lines snp)
+        ((name minor major . inds)
+         ;; TODO: covariates correlation, -r2, -hwe
+         (let* ((ind-count (length inds))
+                (maf (do ((ind 0 (1+ ind))
+                          (maf 0 (+ maf (if (not (list-ref useful-inds ind))
+                                            0
+                                            (string->number (list-ref inds ind))))))
+                         ((= ind ind-count) maf)))
+                (miss-count (count (cut string=? "NA" <>) inds))
+                (maf (/ maf (* 2 (- ind-count miss-count)))))
+           (when (and (< (/ miss-count ind-count) miss-level)
+                      (< maf-level maf (- 1 maf-level)))
+             (hash-set! useful-snp-table name #t))))))
     useful-snp-table))
 
 (define (cleanup-vec vec)
@@ -183,20 +177,22 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
                                       (mdb:val-data-string key))))
             (let* ((vec (vec:alloc individuals 0))
                    (bv (pointer->bytevector
-                        (mdb:val-data data)
-                        (* (sizeof float) individuals))))
-              (let rec ((idx 0))
-                (when (< idx individuals)
-                  (vec:set!
-                   vec idx
-                   (bytevector-ieee-single-native-ref bv (* idx (sizeof float))))
-                  (rec (+ idx 1))))
+                        (mdb:val-data data) (mdb:val-size data)))
+                   (actual-elements (/ (mdb:val-size data) (sizeof float))))
+              (unless (= actual-elements individuals)
+                (format #t "Actual elements (~d) are not equal with individuals (~d)~%"
+                        actual-elements individuals))
+              (do ((idx 0 (1+ idx)))
+                  ((= idx actual-elements))
+                (vec:set!
+                 vec idx
+                 (bytevector-ieee-single-native-ref bv (* idx (sizeof float)))))
               (let ((mean (vec-mean vec)))
                 (vec-replace-nan vec mean)
                 (vec:add-constant! vec (- mean)))
               ;; (cleanup-vec vec)
               (mtx:vec->row! vec mtx line-idx)
-              (set! line-idx (+ 1 line-idx)))))))
+              (set! line-idx (1+ line-idx)))))))
      #:mapsize (* 40 10485760))
     mtx))
 
