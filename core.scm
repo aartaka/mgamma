@@ -14,18 +14,25 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
+;; For speed.
+(define %read-separated-lines-cache (make-hash-table))
 (define (read-separated-lines file)
   "Read tab/space/comma-separated fields from FILE.
 Return a list of lists of values."
-  (call-with-port (open-input-file file)
-    (lambda (port)
-      (let read-lines ((line (first (%read-line port))))
-        (if (eof-object? line)
-            '()
-            (cons (remove string-null?
-                          (string-split
-                           line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
-                  (read-lines (first (%read-line port)))))))))
+  (if (hash-ref %read-separated-lines-cache file)
+      (hash-ref %read-separated-lines-cache file)
+      (hash-set!
+       %read-separated-lines-cache
+       file
+       (call-with-port (open-input-file file)
+         (lambda (port)
+           (let read-lines ((line (first (%read-line port))))
+             (if (eof-object? line)
+                 '()
+                 (cons (remove string-null?
+                               (string-split
+                                line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
+                       (read-lines (first (%read-line port)))))))))))
 
 ;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
 
