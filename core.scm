@@ -14,6 +14,8 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
+(define separators-char-set (list->char-set '(#\Tab #\Space #\,)))
+
 ;; For speed.
 (define %read-separated-lines-cache (make-hash-table))
 (define (read-separated-lines file)
@@ -21,25 +23,26 @@
 Return a list of lists of values."
   (if (hash-ref %read-separated-lines-cache file)
       (hash-ref %read-separated-lines-cache file)
-      (hash-set!
-       %read-separated-lines-cache
-       file
-       (call-with-port (open-input-file file)
-         (lambda (port)
-           (let read-lines ((line (first (%read-line port))))
-             (if (eof-object? line)
-                 '()
-                 (cons (remove string-null?
-                               (string-split
-                                line (lambda (c) (memq c '(#\Tab #\Space #\,)))))
-                       (read-lines (first (%read-line port)))))))))))
+      (begin
+        (hash-set!
+         %read-separated-lines-cache
+         file
+         (call-with-port (open-input-file file)
+           (lambda (port)
+             (let read-lines ((line (first (%read-line port))))
+               (if (eof-object? line)
+                   '()
+                   (cons (remove string-null?
+                                 (string-split line separators-char-set))
+                         (read-lines (first (%read-line port)))))))))
+        (hash-ref %read-separated-lines-cache file))))
 
 ;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
 
 (define (read-bim file)
   (let ((lines (read-separated-lines file)))
     (map (lambda (split)
-           (let (;; How are morgans/centimorgans marked?
+           (let ( ;; How are morgans/centimorgans marked?
                  (position (string->number (third split)))
                  (base-pair-coordinate (string->number (fourth split))))
              `(,(first split)
