@@ -119,14 +119,17 @@ The values are `double' arrays with one value per individual."
        (vec:set! vec index val)))
    vec))
 
+(define (string-na? str)
+  (string=? "NA" str))
+
 (define (useful-individuals pheno.txt)
   (let ((lines (read-separated-lines pheno.txt)))
-    (let rec ((idx 0))
-      (if (= idx (length lines))
-          '()
-          (cons (not (string=? "NA"
-                               (first (list-ref lines idx))))
-                (rec (+ 1 idx)))))))
+    (do ((lines lines (cdr lines))
+         (inds (list (not (string-na? (caar lines))))
+               (cons (not (string-na? (caar lines)))
+                     inds)))
+        ((null? lines)
+         (reverse inds)))))
 
 (define* (useful-snps geno.txt pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
   (let ((lines (read-separated-lines geno.txt))
@@ -142,11 +145,14 @@ The values are `double' arrays with one value per individual."
                              (cdr inds))
                        (useful-inds useful-inds
                                     (cdr useful-inds))
-                       (maf 0 (+ maf (if (not (car useful-inds))
-                                         0
-                                         (string->number (car inds))))))
+                       (maf (if (not (car useful-inds))
+                                0
+                                (string->number (car inds)))
+                            (+ maf (if (not (car useful-inds))
+                                       0
+                                       (string->number (car inds))))))
                       ((null? inds) maf)))
-             (miss-count (count (cut string=? "NA" <>) inds))
+             (miss-count (count string-na? inds))
              (maf (/ maf (* 2 (- ind-count miss-count)))))
         (when (and (< (/ miss-count ind-count) miss-level)
                    (< maf-level maf (- 1 maf-level)))
@@ -158,6 +164,16 @@ The values are `double' arrays with one value per individual."
    #f "memcpy"
    #:return-type '*
    #:arg-types (list '* '* size_t)))
+
+(define (string-control? string)
+  (string-any (lambda (c)
+                (eq? 'Cc (char-general-category c)))
+              string))
+
+(define (cleanup-vector vec)
+  (let ((mean (vec-mean vec)))
+    (vec-replace-nan vec mean)
+    (vec:add-constant! vec (- mean))))
 
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   "Read the data from LMDB-DIR and convert it to GSL matrix.
@@ -172,14 +188,10 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
         (lambda (key data)
           ;; FIXME: It sometimes happens that LMDB table has one
           ;; or two corrupted rows. Ignoring them here
-          (unless (string-any (lambda (c)
-                                (eq? 'Cc (char-general-category c)))
-                              (mdb:val-data-string key))
+          (unless (string-control? (mdb:val-data-string key))
             (let* ((vec (vec:alloc individuals 0)))
               (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
-              (let ((mean (vec-mean vec)))
-                (vec-replace-nan vec mean)
-                (vec:add-constant! vec (- mean)))
+              (cleanup-vector vec)
               (mtx:vec->row! vec mtx line-idx)
               (set! line-idx (+ 1 line-idx)))))))
      #:mapsize (* 40 10485760))
