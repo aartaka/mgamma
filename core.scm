@@ -134,20 +134,23 @@ The values are `double' arrays with one value per individual."
         (useful-snp-table (make-hash-table)))
     (do ((snp 0 (1+ snp)))
         ((= snp (length lines)))
-      (match (list-ref lines snp)
-        ((name minor major . inds)
-         ;; TODO: covariates correlation, -r2, -hwe
-         (let* ((ind-count (length inds))
-                (maf (do ((ind 0 (1+ ind))
-                          (maf 0 (+ maf (if (not (list-ref useful-inds ind))
-                                            0
-                                            (string->number (list-ref inds ind))))))
-                         ((= ind ind-count) maf)))
-                (miss-count (count (cut string=? "NA" <>) inds))
-                (maf (/ maf (* 2 (- ind-count miss-count)))))
-           (when (and (< (/ miss-count ind-count) miss-level)
-                      (< maf-level maf (- 1 maf-level)))
-             (hash-set! useful-snp-table name #t))))))
+      (let* ((row (list-ref lines snp))
+             (name (first row))
+             (inds (cdddr row))
+             (ind-count (length inds))
+             (maf (do ((inds (cdddr row)
+                             (cdr inds))
+                       (useful-inds useful-inds
+                                    (cdr useful-inds))
+                       (maf 0 (+ maf (if (not (car useful-inds))
+                                         0
+                                         (string->number (car inds))))))
+                      ((null? inds) maf)))
+             (miss-count (count (cut string=? "NA" <>) inds))
+             (maf (/ maf (* 2 (- ind-count miss-count)))))
+        (when (and (< (/ miss-count ind-count) miss-level)
+                   (< maf-level maf (- 1 maf-level)))
+          (hash-set! useful-snp-table name #t))))
     useful-snp-table))
 
 (define memcpy
