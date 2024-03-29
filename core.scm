@@ -90,7 +90,7 @@ The values are `double' arrays with one value per individual."
            ;; Weird logic, but here we are: if there's a
            ;; "no-key-found" exception on CURSOR, fill the DB.
            (lambda (exc)
-             (format #t "Keys not found, filling the database at ~s." lmdb-dir)
+             (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
              (do ((lines lines (cdr lines)))
                  ((null? lines))
                (mdb:put txn dbi
@@ -100,7 +100,7 @@ The values are `double' arrays with one value per individual."
                           (mdb:make-val (make-c-struct
                                          (make-list values-len double)
                                          (map string->num/nan values))
-                                        (* (length values-len)
+                                        (* values-len
                                            (sizeof double))))
                         mdb:+noodupdata+)))
          (lambda ()
