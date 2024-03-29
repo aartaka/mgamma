@@ -103,12 +103,10 @@ Return a list of lists of values."
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
 The values are `double' arrays with one value per individual."
-  (mdb:call-with-env-and-txn
+  (mdb:call-with-wrapped-cursor
    lmdb-dir
-   (lambda (env txn)
-     (let* ((dbi (mdb:dbi-open txn #f 0))
-            (lines (read-separated-lines geno.txt-file))
-            (cursor (mdb:cursor-open txn dbi)))
+   (lambda (env txn dbi cursor)
+     (let* ((lines (read-separated-lines geno.txt-file)))
        (with-exception-handler
            ;; Weird logic, but here we are: if there's a
            ;; "no-key-found" exception on CURSOR, fill the DB.
@@ -128,7 +126,6 @@ The values are `double' arrays with one value per individual."
                         mdb:+noodupdata+)))
          (lambda ()
            (mdb:cursor-first cursor)))
-       (mdb:cursor-close cursor)
        (list (- (length (first lines)) 3)
              (map first lines))))
    #:mapsize (* 40 10485760)))
