@@ -23,14 +23,13 @@ Return a list of strings in between these separators."
             (start-idx #f))
     (cond
      ((< idx (string-length string))
-      (let ((char (string-ref string idx)))
+      (let* ((char (string-ref string idx))
+             (separator? (char-set-contains? separators-char-set char)))
         (cond
-         ((and start-idx
-               (char-set-contains? separators-char-set char))
+         ((and start-idx separator?)
           (cons (substring string start-idx idx)
                 (rec (1+ idx) #f)))
-         ((and (not start-idx)
-               (not (char-set-contains? separators-char-set char)))
+         ((and (not start-idx) (not separator?))
           (rec (1+ idx) idx))
          (else
           (rec (1+ idx) start-idx)))))
