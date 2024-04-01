@@ -86,14 +86,12 @@ Return a list of lists of values."
 (define (read-anno.txt file)
   (let ((lines (read-separated-lines file)))
     (map (lambda (split)
-           (let ((marker (first split))
-                 (pos (second split))
-                 (chromosome (third split))
-                 (unidentified? (fourth split)))
-             (list marker
-                   (string->num/nan pos)
-                   (string->number chromosome)
-                   (string->number unidentified?))))
+           (match split
+             ((marker pos chromosome unidentified?)
+              (list marker
+                    (string->num/nan pos)
+                    (string->number chromosome)
+                    (string->number unidentified?)))))
          lines)))
 
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
