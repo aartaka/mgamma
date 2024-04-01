@@ -201,11 +201,6 @@ The values are `double' arrays with one value per individual."
    #:return-type '*
    #:arg-types (list '* '* size_t)))
 
-(define (string-control? string)
-  (string-any (lambda (c)
-                (eq? 'Cc (char-general-category c)))
-              string))
-
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   "Read the data from LMDB-DIR and convert it to GSL matrix.
 The resulting matrix is #MARKERSxINDIVIDUALS sized."
@@ -219,12 +214,11 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
         (lambda (key data)
           ;; FIXME: It sometimes happens that LMDB table has one
           ;; or two corrupted rows. Ignoring them here
-          (unless (string-control? (mdb:val-data-string key))
-            (let* ((vec (vec:alloc individuals 0)))
-              (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
-              (cleanup-vector vec)
-              (mtx:vec->row! vec mtx line-idx)
-              (set! line-idx (1+ line-idx)))))))
+          (let* ((vec (vec:alloc individuals 0)))
+            (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
+            (cleanup-vector vec)
+            (mtx:vec->row! vec mtx line-idx)
+            (set! line-idx (1+ line-idx))))))
      #:mapsize (* 40 10485760))
     mtx))
 
