@@ -155,6 +155,18 @@ The values are `double' arrays with one value per individual."
         ((null? lines)
          (reverse inds)))))
 
+(define-inlinable (count-false lst)
+  (do ((lst lst (cdr lst))
+       (false-count
+        (if (car lst)
+            0
+            1)
+        (+ false-count
+           (if (car lst)
+               0
+               1))))
+      ((null? lst) false-count)))
+
 (define* (useful-snps geno.txt pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
   (let* ((lines (read-separated-lines geno.txt))
          (useful-inds (useful-individuals pheno.txt))
@@ -175,7 +187,7 @@ The values are `double' arrays with one value per individual."
                                        (car inds)
                                        0))))
                       ((null? inds) maf)))
-             (miss-count (count (cut not <>) inds))
+             (miss-count (count-false inds))
              (maf (/ maf (* 2 (- ind-count miss-count)))))
         (when (and (< (/ miss-count ind-count) miss-level)
                    (< maf-level maf (- 1 maf-level)))
