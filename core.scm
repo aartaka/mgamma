@@ -155,7 +155,7 @@ The values are `double' arrays with one value per individual."
         ((null? lines)
          (reverse inds)))))
 
-(define-inlinable (count-false lst)
+(define (count-false lst)
   (do ((lst lst (cdr lst))
        (false-count
         (if (car lst)
