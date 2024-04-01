@@ -103,32 +103,28 @@ Return a list of lists of values."
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
 The values are `double' arrays with one value per individual."
-  (mdb:call-with-wrapped-cursor
-   lmdb-dir
-   (lambda (env txn dbi cursor)
-     (let* ((lines (read-separated-lines geno.txt-file))
-            (double-size (sizeof double)))
-       (with-exception-handler
-           ;; Weird logic, but here we are: if there's a
-           ;; "no-key-found" exception on CURSOR, fill the DB.
-           (lambda (exc)
-             (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
-             (do ((lines lines (cdr lines)))
-                 ((null? lines))
-               (mdb:put txn dbi
-                        (mdb:make-val (first (first lines)))
-                        (let* ((values (cdddr (first lines)))
-                               (values-len (length values)))
-                          (mdb:make-val (make-c-struct
-                                         (make-list values-len double)
-                                         (map string->num/nan values))
-                                        (* values-len double-size)))
-                        mdb:+noodupdata+)))
-         (lambda ()
-           (mdb:cursor-first cursor)))
-       (list (- (length (first lines)) 3)
-             (map first lines))))
-   #:mapsize (* 40 10485760)))
+  (let ((lines (read-separated-lines geno.txt-file)))
+    (unless (file-exists? (string-append lmdb-dir "data.mdb"))
+      (mdb:call-with-wrapped-cursor
+       lmdb-dir
+       (lambda (env txn dbi cursor)
+         (let* ((lines (read-separated-lines geno.txt-file))
+                (double-size (sizeof double)))
+           (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
+           (do ((lines lines (cdr lines)))
+               ((null? lines))
+             (mdb:put txn dbi
+                      (mdb:make-val (first (first lines)))
+                      (let* ((values (cdddr (first lines)))
+                             (values-len (length values)))
+                        (mdb:make-val (make-c-struct
+                                       (make-list values-len double)
+                                       (map string->num/nan values))
+                                      (* values-len double-size)))
+                      mdb:+noodupdata+))))
+       #:mapsize (* 40 10485760)))
+    (list (- (length (car lines)) 3)
+          (map car lines))))
 
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
