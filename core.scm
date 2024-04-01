@@ -143,6 +143,11 @@ The values are `double' arrays with one value per individual."
        (vec:set! vec index val)))
    vec))
 
+(define (cleanup-vector vec)
+  (let ((mean (vec-mean vec)))
+    (vec-replace-nan vec mean)
+    (vec:add-constant! vec (- mean))))
+
 (define (string-na? str)
   (string= "NA" str))
 
@@ -204,11 +209,6 @@ The values are `double' arrays with one value per individual."
   (string-any (lambda (c)
                 (eq? 'Cc (char-general-category c)))
               string))
-
-(define (cleanup-vector vec)
-  (let ((mean (vec-mean vec)))
-    (vec-replace-nan vec mean)
-    (vec:add-constant! vec (- mean))))
 
 (define (lmdb->genotypes-mtx lmdb-dir markers individuals)
   "Read the data from LMDB-DIR and convert it to GSL matrix.
