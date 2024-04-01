@@ -144,7 +144,7 @@ The values are `double' arrays with one value per individual."
    vec))
 
 (define (string-na? str)
-  (string=? "NA" str))
+  (string= "NA" str))
 
 (define (useful-individuals pheno.txt)
   (let ((lines (read-separated-lines pheno.txt)))
