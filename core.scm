@@ -106,7 +106,8 @@ The values are `double' arrays with one value per individual."
   (mdb:call-with-wrapped-cursor
    lmdb-dir
    (lambda (env txn dbi cursor)
-     (let* ((lines (read-separated-lines geno.txt-file)))
+     (let* ((lines (read-separated-lines geno.txt-file))
+            (double-size (sizeof double)))
        (with-exception-handler
            ;; Weird logic, but here we are: if there's a
            ;; "no-key-found" exception on CURSOR, fill the DB.
@@ -121,8 +122,7 @@ The values are `double' arrays with one value per individual."
                           (mdb:make-val (make-c-struct
                                          (make-list values-len double)
                                          (map string->num/nan values))
-                                        (* values-len
-                                           (sizeof double))))
+                                        (* values-len double-size)))
                         mdb:+noodupdata+)))
          (lambda ()
            (mdb:cursor-first cursor)))
