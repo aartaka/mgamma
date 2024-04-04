@@ -14,31 +14,29 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
-(define separators-char-set (list->char-set '(#\Tab #\Space #\,)))
+(define strtok
+  (foreign-library-function
+   #f "strtok"
+   #:return-type '*
+   #:arg-types (list '* '*)))
+(define strcpy
+  (foreign-library-function
+   #f "strcpy"
+   #:return-type void
+   #:arg-types '(* *)))
 
-(define (string-separate string)
-  "Split the string on tab, space, or comma sequences.
-Return a list of strings in between these separators."
-  (let ((string-len (string-length string)))
-    (let rec ((idx 0)
-              (start-idx #f))
-      (cond
-       ((< idx string-len)
-        (let* ((char (string-ref string idx))
-               (separator? (char-set-contains? separators-char-set char)))
-          (cond
-           ((and start-idx separator?)
-            (cons (substring string start-idx idx)
-                  (rec (1+ idx) #f)))
-           ((not (or start-idx separator?))
-            (rec (1+ idx) idx))
-           (else
-            (rec (1+ idx) start-idx)))))
-       ((and start-idx
-             (< start-idx idx))
-        (list (substring string start-idx idx)))
-       (else
-        '())))))
+(define (pointer->string* ptr)
+  (let ((buffer (make-bytevector 100 0)))
+    (strcpy (bytevector->pointer buffer) ptr)
+    (utf8->string buffer)))
+
+(define strtok-separators (string->pointer "\t ," "UTF-8"))
+(define (strtokenize string)
+  (do ((token (strtok (string->pointer string "UTF-8") strtok-separators)
+              (strtok %null-pointer strtok-separators))
+       (tokens (list) (cons (pointer->string* token) tokens)))
+      ((eq? %null-pointer token)
+       (reverse tokens))))
 
 ;; For speed.
 (define %read-separated-lines-cache (make-hash-table))
@@ -56,7 +54,7 @@ Return a list of lists of values."
              (let read-lines ((line (first (%read-line port))))
                (if (eof-object? line)
                    '()
-                   (cons (string-separate line)
+                   (cons (strtokenize line)
                          (read-lines (first (%read-line port)))))))))
         (hash-ref %read-separated-lines-cache file))))
 
