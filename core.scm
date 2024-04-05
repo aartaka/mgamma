@@ -14,6 +14,8 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
+;; TODO: Make a state machine parser instead? Something like guile-csv
+;; TODO: Apply PEG to a whole file?
 (define separators-char-set (list->char-set '(#\Tab #\Space #\,)))
 
 (define (string-separate string)
