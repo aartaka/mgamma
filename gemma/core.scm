@@ -99,7 +99,7 @@ Return a list of lists of values."
 ;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
 
 (define (geno.txt->lmdb geno.txt-file lmdb-dir)
-  "Convert GENO.TXT-FILE to a n LMDB-DIR-located database.
+  "Convert GENO.TXT-FILE to an LMDB-DIR-located database.
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
 The values are `double' arrays with one value per individual."
