@@ -222,9 +222,6 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
      #:mapsize (* 40 10485760))
     mtx))
 
-;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))) 0)
-;; (vector-ref (mtx->2d-vector (second (read-geno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))) 0)
-
 (define (kinship mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
