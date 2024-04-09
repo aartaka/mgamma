@@ -237,7 +237,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
          (lambda (row column value)
            (when (not (= row last-row))
              (newline port))
-           (display value port))
+           (format port "~f " value))
          kinship-mtx)))))
 
 (define (cxx.txt->kinship cxx.txt)
