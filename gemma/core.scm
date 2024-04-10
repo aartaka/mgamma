@@ -129,8 +129,15 @@ The values are `double' arrays with one value per individual."
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
 (define (vec-mean vec)
-  (/ (vec:sum vec)
-     (vec:length vec)))
+  (let ((sum 0)
+        (nans 0))
+    (vec:for-vec
+     (lambda (index value)
+       (if (nan? value)
+           (set! nans (1+ nans))
+           (set! sum (+ value sum))))
+     vec)
+    (/ sum (- (vec:length vec) nans))))
 
 (define (vec-replace-nan vec val)
   (vec:for-vec
