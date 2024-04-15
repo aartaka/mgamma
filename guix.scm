@@ -1,0 +1,1 @@
+/home/aartaka/git/guile-gemma/.guix/guile-gemma-package.scm
