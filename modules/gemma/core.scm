@@ -13,7 +13,12 @@
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
-  #:export (kmain))
+  #:export (geno.txt->lmdb
+            lmdb->genotypes-mtx
+            kinship
+            kinship->cxx.txt
+            cxx.txt->kinship
+            kmain))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
 ;; TODO: Apply PEG to a whole file?
