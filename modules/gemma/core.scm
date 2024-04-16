@@ -249,7 +249,8 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
         (mtx:for-each
          (lambda (row column value)
            (when (not (= row last-row))
-             (newline port))
+             (newline port)
+             (set! last-row row))
            (format port "~f " value))
          kinship-mtx)))))
 
