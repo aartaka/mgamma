@@ -1,5 +1,5 @@
 #! /usr/local/bin/guile \
---no-auto-compile -e main
+--no-auto-compile -e main -s
 !#
 
 (use-modules (gemma core))
