@@ -113,7 +113,7 @@ The values are `double' arrays with one value per individual."
   (let ((lines (read-separated-lines geno.txt-file)))
     (unless (file-exists? (string-append lmdb-dir "data.mdb"))
       (mdb:call-with-wrapped-cursor
-       lmdb-dir
+       lmdb-dir #f
        (lambda (env txn dbi cursor)
          (let* ((lines (read-separated-lines geno.txt-file))
                 (double-size (sizeof double)))
