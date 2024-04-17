@@ -30,7 +30,7 @@
                       (let ((guile-bin (string-append (assoc-ref inputs "guile")
                                                       "/bin/guile")))
                         (substitute*
-                            '("gemma.scm")
+                            '("mgamma.scm")
                           (("/usr/local/bin/guile")
                            guile-bin))
                         #t)))
@@ -38,7 +38,7 @@
                     (lambda* (#:key inputs outputs #:allow-other-keys)
                       (let* ((bin (string-append (assoc-ref outputs "out")
                                                  "/bin"))
-                             (real (string-append bin "/gemma.scm"))
+                             (real (string-append bin "/mgamma"))
                              (bash (string-append (assoc-ref inputs "bash")
                                                   "/bin/bash"))
                              (self (string-append (assoc-ref outputs "out")
@@ -48,7 +48,7 @@
                              (lmdb (string-append (assoc-ref inputs "guile-lmdb-git")
                                                   "/share/guile/site/3.0")))
                         (mkdir-p bin)
-                        (copy-file "gemma.scm" real)
+                        (copy-file "mgamma.scm" real)
                         (wrap-program real #:sh bash
                                       ;; For better backtraces.
                                       (list "COLUMNS" ":" '= (list "1000"))
