@@ -221,7 +221,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
   (let* ((mtx (mtx:alloc (length markers) individuals))
          (line-idx 0))
     (mdb:call-with-wrapped-cursor
-     lmdb-dir
+     lmdb-dir #f
      (lambda (env txn dbi cursor)
        (mdb:for-cursor
         cursor
