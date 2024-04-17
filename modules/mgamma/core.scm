@@ -17,6 +17,7 @@
             lmdb->genotypes-mtx
             kinship
             kinship->cxx.txt
+            kinship->lmdb
             cxx.txt->kinship
             kmain))
 
@@ -241,6 +242,21 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
     (mtx:scale! result (/ 1 n-useful-snps))
     result))
+
+(define (kinship->lmdb kinship-mtx lmdb-dir)
+  (mdb:with-env-and-txn
+   (lmdb-dir)
+   (env txn)
+   (let ((dbi (mdb:dbi-open txn))
+         (rows (mtx:rows kinship-mtx))
+         (row-size (* (sizeof double) (mtx:columns kinship-mtx)))
+         (ptr-size (sizeof '*)))
+     (do ((row 0 (1+ row)))
+         ((= row rows))
+       (mdb:put!
+        txn dbi (mdb:make-val (make-pointer row) ptr-size)
+        (mdb:make-val (mtx:ptr kinship-mtx row 0)
+                      row-size))))))
 
 (define (kinship->cxx.txt kinship-mtx cxx.txt)
   (let ((last-row 0))
