@@ -1,4 +1,4 @@
-(define-module (gemma core)
+(define-module (mgamma core)
   #:use-module (ice-9 ports)
   #:use-module (ice-9 textual-ports)
   #:use-module (ice-9 rdelim)

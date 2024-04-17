@@ -2,7 +2,7 @@
 --no-auto-compile -e main -s
 !#
 
-(use-modules (gemma core))
+(use-modules (mgamma core))
 (use-modules (ice-9 getopt-long))
 (use-modules (ice-9 format))
 (use-modules (srfi srfi-1))

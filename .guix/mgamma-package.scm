@@ -1,4 +1,4 @@
-(define-module (guile-gemma-package)
+(define-module (mgamma-package)
  #:use-module (gnu packages guile)
  #:use-module (gnu packages guile-xyz)
  #:use-module (gnu packages databases)
@@ -12,12 +12,12 @@
  #:use-module (guile-gsl-package)
  #:use-module (guile-lmdb-package))
 
-(define-public guile-gemma-git
+(define-public mgamma-git
   (package
-    (name "guile-gemma-git")
+    (name "mgamma-git")
     (version "0.0.1")
     (source (local-file ".."
-                        "guile-gemma-git-checkout"
+                        "mgamma-git-checkout"
                         #:recursive? #t
                         #:select? (or (git-predicate (dirname (current-source-directory)))
                                       (const #t))))
@@ -63,4 +63,4 @@
     (description "")
     (license license:gpl3+)))
 
-guile-gemma-git
+mgamma-git
