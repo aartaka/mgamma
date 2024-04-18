@@ -15,7 +15,7 @@
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:export (geno.txt->lmdb
             lmdb->genotypes-mtx
-            kinship
+            kinship-mtx
             kinship->cxx.txt
             kinship->lmdb
             cxx.txt->kinship
@@ -234,7 +234,7 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
      #:mapsize (* 40 10485760))
     mtx))
 
-(define (kinship mtx n-useful-snps)
+(define (kinship-mtx mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
@@ -287,8 +287,8 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
 (define (kmain geno.txt pheno.txt lmdb-dir)
   (let* ((meta (geno.txt->lmdb geno.txt lmdb-dir))
          (useful-snps (useful-snps geno.txt pheno.txt))
-         (mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta))))
-    (kinship mtx (hash-count (cut or #t <> <>) useful-snps))))
+         (mtx (lmdb->genotypes-mtx lmdb-dir (first meta) (second meta))))
+    (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))
 
 ;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
 ;; (define lmdb-dir "/tmp/lmdb-bxd/")
