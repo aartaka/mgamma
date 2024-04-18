@@ -226,8 +226,6 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
        (mdb:for-cursor
         cursor
         (lambda (key data)
-          ;; FIXME: It sometimes happens that LMDB table has one
-          ;; or two corrupted rows. Ignoring them here
           (let* ((vec (vec:alloc individuals 0)))
             (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
             (cleanup-vector vec)
