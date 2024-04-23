@@ -25,17 +25,21 @@
     (map-size                  (value #t))
     (output  (single-char #\o) (value #t))))
 
+(define (mdb-file? file)
+  (or (string-suffix? ".mdb" file)
+      (string-suffix? ".lmdb" file)))
+
+(define (txt-file? file)
+  (or (string-suffix? ".out" file)
+      (string-suffix? ".txt" file)))
+
 (define (convert options)
   (unless (option-ref options 'help #f)
     (ensure-options options 'output))
   (let* ((help (option-ref options 'help #f))
          (output (option-ref options 'output #f))
-         (mdb-out? (and output
-                        (or (string-suffix? ".mdb" output)
-                            (string-suffix? ".lmdb" output))))
-         (txt-out? (and output
-                        (or (string-suffix? ".out" output)
-                            (string-suffix? ".txt" output)))))
+         (mdb-out? (and output (mdb-file? output)))
+         (txt-out? (and output (txt-file? output))))
     (cond
      (help
       (format #t "Convert files from one format to another:
@@ -71,12 +75,8 @@ kinship lmdb -> txt     --kinship data.mdb --output kinship.txt~%"))
     (ensure-options options 'output 'geno 'pheno))
   (let* ((help (option-ref options 'help #f))
          (output (option-ref options 'output #f))
-         (mdb-out? (and output
-                        (or (string-suffix? ".mdb" output)
-                            (string-suffix? ".lmdb" output))))
-         (txt-out? (and output
-                        (or (string-suffix? ".out" output)
-                            (string-suffix? ".txt" output)))))
+         (mdb-out? (and output (mdb-file? output)))
+         (txt-out? (and output (txt-file? output))))
     (cond
      (help
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
