@@ -69,14 +69,14 @@ kinship lmdb -> txt     --kinship data.mdb --output kinship.txt~%"))
 (define (kinship options)
   (unless (option-ref options 'help #f)
     (ensure-options options 'output 'geno 'pheno))
-  (let ((help (option-ref options 'help #f))
-        (output (option-ref options 'output #f))
-        (mdb-out? (and output
-                       (or (string-suffix? ".mdb" output)
-                           (string-suffix? ".lmdb" output))))
-        (txt-out? (and output
-                       (or (string-suffix? ".out" output)
-                           (string-suffix? ".txt" output)))))
+  (let* ((help (option-ref options 'help #f))
+         (output (option-ref options 'output #f))
+         (mdb-out? (and output
+                        (or (string-suffix? ".mdb" output)
+                            (string-suffix? ".lmdb" output))))
+         (txt-out? (and output
+                        (or (string-suffix? ".out" output)
+                            (string-suffix? ".txt" output)))))
     (cond
      (help
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
