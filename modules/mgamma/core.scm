@@ -308,7 +308,7 @@ The values are `double' arrays with one value per individual."
          (line-len (length (first lines)))
          (result (mtx:alloc lines-len line-len)))
     (do ((row-idx 0 (1+ row-idx))
-         (row lines (cdr lines)))
+         (row lines (cdr row)))
         ((= row-idx lines-len))
       (do ((column-idx 0 (1+ column-idx))
            (column (first row) (cdr column)))
