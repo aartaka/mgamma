@@ -18,6 +18,7 @@
             kinship-mtx
             kinship->cxx.txt
             kinship->lmdb
+            lmdb->kinship
             cxx.txt->kinship
             kmain))
 
@@ -215,10 +216,10 @@ The values are `double' arrays with one value per individual."
    #:return-type '*
    #:arg-types (list '* '* size_t)))
 
-(define (lmdb->genotypes-mtx lmdb-dir markers individuals)
-  "Read the data from LMDB-DIR and convert it to GSL matrix.
-The resulting matrix is #MARKERSxINDIVIDUALS sized."
-  (let* ((mtx (mtx:alloc (length markers) individuals))
+(define* (lmdb->genotypes-mtx lmdb-dir #:optional markers individuals)
+  "Read the data from LMDB-DIR and convert it to GSL matrix."
+  (let* ((mtx #f)
+         (tmp-vec #f)
          (line-idx 0))
     (mdb:call-with-wrapped-cursor
      lmdb-dir #f
@@ -226,13 +227,24 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
        (mdb:for-cursor
         cursor
         (lambda (key data)
-          (let* ((vec (vec:alloc individuals 0)))
-            (memcpy (vec:ptr vec 0) (mdb:val-data data) (mdb:val-size data))
-            (cleanup-vector vec)
-            (mtx:vec->row! vec mtx line-idx)
-            (set! line-idx (1+ line-idx))))))
+          (unless mtx
+            (let ((individuals (or individuals
+                                   (/ (mdb:val-size data) (sizeof double)))))
+              ;; Markers x individuals
+              (set! mtx (mtx:alloc (if markers
+                                       (length markers)
+                                       (mdb:stat-entries (mdb:dbi-stat txn dbi)))
+                                   individuals))
+              (set! tmp-vec (vec:alloc individuals 0))))
+          (memcpy (vec:ptr tmp-vec 0) (mdb:val-data data) (mdb:val-size data))
+          (cleanup-vector tmp-vec)
+          (mtx:vec->row! tmp-vec mtx line-idx)
+          (set! line-idx (1+ line-idx)))))
      #:mapsize (* 40 10485760))
-    mtx))
+    (when tmp-vec
+      (vec:free tmp-vec))
+    (or mtx
+        (mtx:alloc 0 0 0))))
 
 (define (kinship-mtx mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
@@ -248,13 +260,35 @@ The resulting matrix is #MARKERSxINDIVIDUALS sized."
    (let ((dbi (mdb:dbi-open txn))
          (rows (mtx:rows kinship-mtx))
          (row-size (* (sizeof double) (mtx:columns kinship-mtx)))
-         (ptr-size (sizeof '*)))
+         (int-size (sizeof unsigned-int)))
      (do ((row 0 (1+ row)))
          ((= row rows))
        (mdb:put!
-        txn dbi (mdb:make-val (make-pointer row) ptr-size)
+        txn dbi
+        (let ((ptr (make-c-struct (list unsigned-int) (list row))))
+          (format #t "~a~%" (first (parse-c-struct ptr (list unsigned-int))))
+          (mdb:make-val ptr int-size))
         (mdb:make-val (mtx:ptr kinship-mtx row 0)
                       row-size))))))
+
+(define (lmdb->kinship lmdb-dir)
+  (let ((mtx #f))
+    (mdb:with-wrapped-cursor
+     (lmdb-dir #f)
+     (env txn dbi cursor)
+     (let ((entries (mdb:stat-entries (mdb:dbi-stat txn dbi))))
+       (mdb:for-cursor
+        cursor
+        (lambda (key value)
+          (unless mtx
+            (set! mtx (mtx:alloc (/ (mdb:val-size value) (sizeof double))
+                                 (/ (mdb:val-size value) (sizeof double)))))
+          (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
+            (format #t "~a~%" row)
+            (memcpy (mtx:ptr mtx row 0)
+                    (mdb:val-data value)
+                    (mdb:val-size value)))))))
+    mtx))
 
 (define (kinship->cxx.txt kinship-mtx cxx.txt)
   (let ((last-row 0))

@@ -27,7 +27,7 @@ mgamma convert -g genofile -a annofile [--map-size 10M] -o geno.mdb
 Use this to compute the kinship matrix
 
 ```
-mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.lmdb -o kinship.mdb
+mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.lmdb -p pheno.txt -o kinship.mdb
 ```
 
 To compute the LMM we use
