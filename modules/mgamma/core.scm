@@ -265,9 +265,8 @@ The values are `double' arrays with one value per individual."
          ((= row rows))
        (mdb:put!
         txn dbi
-        (let ((ptr (make-c-struct (list unsigned-int) (list row))))
-          (format #t "~a~%" (first (parse-c-struct ptr (list unsigned-int))))
-          (mdb:make-val ptr int-size))
+        (mdb:make-val (make-c-struct (list unsigned-int) (list row))
+                      int-size)
         (mdb:make-val (mtx:ptr kinship-mtx row 0)
                       row-size))))))
 
@@ -276,18 +275,15 @@ The values are `double' arrays with one value per individual."
     (mdb:with-wrapped-cursor
      (lmdb-dir #f)
      (env txn dbi cursor)
-     (let ((entries (mdb:stat-entries (mdb:dbi-stat txn dbi))))
-       (mdb:for-cursor
-        cursor
-        (lambda (key value)
-          (unless mtx
-            (set! mtx (mtx:alloc (/ (mdb:val-size value) (sizeof double))
-                                 (/ (mdb:val-size value) (sizeof double)))))
-          (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
-            (format #t "~a~%" row)
-            (memcpy (mtx:ptr mtx row 0)
-                    (mdb:val-data value)
-                    (mdb:val-size value)))))))
+     (mdb:for-cursor
+      cursor
+      (lambda (key value)
+        (unless mtx
+          (set! mtx (mtx:alloc (/ (mdb:val-size value) (sizeof double))
+                               (/ (mdb:val-size value) (sizeof double)))))
+        (memcpy (mtx:ptr mtx (first (mdb:val-data-parse key (list unsigned-int))) 0)
+                (mdb:val-data value)
+                (mdb:val-size value)))))
     mtx))
 
 (define (kinship->cxx.txt kinship-mtx cxx.txt)
