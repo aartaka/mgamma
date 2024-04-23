@@ -11,7 +11,7 @@
   (let rec ((names names))
     (unless (null? names)
       (unless (option-ref options (car names) #f)
-        (error (format #t "Missing mandatory --~a option" (car names))))
+        (error (format #t "Missing mandatory --~a option~%" (car names))))
       (rec (cdr names)))))
 
 (define regular-options
