@@ -80,7 +80,7 @@ kinship lmdb -> txt     --kinship data.mdb --output kinship.txt~%"))
     (cond
      (help
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
-mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno.txt~%")))))
+mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%")))))
 
 (define (main args)
   (let* ((command (if (> (length args) 1)
