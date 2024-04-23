@@ -216,7 +216,7 @@ The values are `double' arrays with one value per individual."
    #:return-type '*
    #:arg-types (list '* '* size_t)))
 
-(define* (lmdb->genotypes-mtx lmdb-dir #:optional markers individuals)
+(define* (lmdb->genotypes-mtx lmdb-dir)
   "Read the data from LMDB-DIR and convert it to GSL matrix."
   (let* ((mtx #f)
          (tmp-vec #f)
@@ -228,12 +228,9 @@ The values are `double' arrays with one value per individual."
         cursor
         (lambda (key data)
           (unless mtx
-            (let ((individuals (or individuals
-                                   (/ (mdb:val-size data) (sizeof double)))))
+            (let ((individuals (/ (mdb:val-size data) (sizeof double))))
               ;; Markers x individuals
-              (set! mtx (mtx:alloc (if markers
-                                       (length markers)
-                                       (mdb:stat-entries (mdb:dbi-stat txn dbi)))
+              (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                    individuals))
               (set! tmp-vec (vec:alloc individuals 0))))
           (memcpy (vec:ptr tmp-vec 0) (mdb:val-data data) (mdb:val-size data))
@@ -317,7 +314,7 @@ The values are `double' arrays with one value per individual."
 (define (kmain geno.txt pheno.txt lmdb-dir)
   (let* ((meta (geno.txt->lmdb geno.txt lmdb-dir))
          (useful-snps (useful-snps geno.txt pheno.txt))
-         (mtx (lmdb->genotypes-mtx lmdb-dir (first meta) (second meta))))
+         (mtx (lmdb->genotypes-mtx lmdb-dir)))
     (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))
 
 ;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
