@@ -20,6 +20,8 @@
             kinship->lmdb
             lmdb->kinship
             cxx.txt->kinship
+            useful-snps
+            useful-individuals
             kmain))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
