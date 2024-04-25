@@ -118,8 +118,7 @@ The values are `double' arrays with one value per individual."
       (mdb:call-with-wrapped-cursor
        lmdb-dir #f
        (lambda (env txn dbi cursor)
-         (let* ((lines (read-separated-lines geno.txt-file))
-                (double-size (sizeof double)))
+         (let* ((double-size (sizeof double)))
            (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
            (do ((lines lines (cdr lines)))
                ((null? lines))
