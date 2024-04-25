@@ -318,7 +318,7 @@ The values are `double' arrays with one value per individual."
 (define (kmain geno.txt pheno.txt lmdb-dir)
   (let* ((meta (geno.txt->lmdb geno.txt lmdb-dir))
          (useful-snps (useful-snps geno.txt pheno.txt))
-         (mtx (second (lmdb->genotypes-mtx lmdb-dir))))
+         (mtx (first (lmdb->genotypes-mtx lmdb-dir))))
     (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))
 
 ;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
