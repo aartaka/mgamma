@@ -5,7 +5,9 @@
 (use-modules (mgamma core))
 (use-modules (ice-9 getopt-long))
 (use-modules (ice-9 format))
+(use-modules (ice-9 match))
 (use-modules (srfi srfi-1))
+(use-modules (srfi srfi-26))
 
 (define (ensure-options options . names)
   (let rec ((names names))
@@ -80,7 +82,24 @@ kinship lmdb -> txt     --kinship data.mdb --output kinship.txt~%"))
     (cond
      (help
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
-mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%")))))
+mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%"))
+     (else
+      (let* ((geno (option-ref options 'geno #f))
+             (geno-txt? (txt-file? geno)))
+        (match (if geno-txt?
+                   (geno.txt->genotypes-mtx geno)
+                   (lmdb->genotypes-mtx (dirname geno)))
+          ((geno-mtx markers)
+           (let* ((useful-snps (useful-snps geno-mtx markers (option-ref options 'pheno #f)))
+                  (_ (cleanup-mtx geno-mtx))
+                  (kin-mtx (kinship-mtx geno-mtx (hash-count (cut or #t <> <>) useful-snps))))
+             (if txt-out?
+                 (kinship->cxx.txt kin-mtx output)
+                 (kinship->lmdb kin-mtx (dirname output)))))))))
+    (when (and mdb-out?
+               (not help))
+      (rename-file (string-append (dirname output) "/data.mdb")
+                   output))))
 
 (define (main args)
   (let* ((command (if (> (length args) 1)
