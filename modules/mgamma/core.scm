@@ -23,6 +23,7 @@
             cxx.txt->kinship
             useful-snps
             useful-individuals
+            cleanup-mtx
             kmain))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
@@ -251,7 +252,9 @@ The values are `double' arrays with one value per individual."
   "Convert GENO.TXT-FILE to a proper genotype matrix
 Return a (MATRIX MARKER-NAMES) list."
   (let* ((lines (read-separated-lines geno.txt))
-         (mtx (mtx:alloc (length lines) (length (first lines)) +nan.0)))
+         (mtx (mtx:alloc (length lines)
+                         ;; The first 3 lines: marker, chr, and chr.
+                         (- (length (first lines)) 3) +nan.0)))
     (do ((row 0 (1+ row))
          (lines lines (cdr lines)))
         ((null? lines))
@@ -293,10 +296,9 @@ Return a (MATRIX MARKER-NAMES) list."
 (define (kinship-mtx mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
+    (cleanup-mtx mtx)
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
-    (format #t "The first element is ~a~%" (mtx:get result 0 0))
     (mtx:scale! result (/ 1 n-useful-snps))
-    (format #t "The first element is ~a~%" (mtx:get result 0 0))
     result))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
@@ -365,9 +367,6 @@ Return a (MATRIX MARKER-NAMES) list."
   (match (lmdb->genotypes-mtx lmdb-dir)
     ((mtx markers)
      (let ((useful-snps (useful-snps mtx markers pheno.txt)))
-       (format #t "The first element is ~a~%" (mtx:get mtx 0 0))
-       (cleanup-mtx mtx)
-       (format #t "The first element is ~a~%" (mtx:get mtx 0 0))
        (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))))
 
 ;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
