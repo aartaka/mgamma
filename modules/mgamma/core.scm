@@ -14,6 +14,7 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:export (geno.txt->lmdb
+            geno.txt->genotypes-mtx
             lmdb->genotypes-mtx
             kinship-mtx
             kinship->cxx.txt
@@ -113,24 +114,24 @@ Return a list of lists of values."
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
 The values are `double' arrays with one value per individual."
-  (let ((lines (read-separated-lines geno.txt-file)))
+  (let ((lines (read-separated-lines geno.txt-file))
+        (double-size (sizeof double)))
     (unless (file-exists? (string-append lmdb-dir "data.mdb"))
       (mdb:call-with-wrapped-cursor
        lmdb-dir #f
        (lambda (env txn dbi cursor)
-         (let* ((double-size (sizeof double)))
-           (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
-           (do ((lines lines (cdr lines)))
-               ((null? lines))
-             (mdb:put txn dbi
-                      (mdb:make-val (first (first lines)))
-                      (let* ((values (cdddr (first lines)))
-                             (values-len (length values)))
-                        (mdb:make-val (make-c-struct
-                                       (make-list values-len double)
-                                       (map string->num/nan values))
-                                      (* values-len double-size)))
-                      mdb:+noodupdata+))))
+         (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
+         (do ((lines lines (cdr lines)))
+             ((null? lines))
+           (mdb:put txn dbi
+                    (mdb:make-val (first (first lines)))
+                    (let* ((values (cdddr (first lines)))
+                           (values-len (length values)))
+                      (mdb:make-val (make-c-struct
+                                     (make-list values-len double)
+                                     (map string->num/nan values))
+                                    (* values-len double-size)))
+                    mdb:+noodupdata+)))
        #:mapsize (* 40 10485760)))
     (list (- (length (car lines)) 3)
           (map car lines))))
@@ -154,11 +155,6 @@ The values are `double' arrays with one value per individual."
      (when (nan? value)
        (vec:set! vec index val)))
    vec))
-
-(define (cleanup-vector vec)
-  (let ((mean (vec-mean vec)))
-    (vec-replace-nan vec mean)
-    (vec:add-constant! vec (- mean))))
 
 (define (string-na? str)
   (string= "NA" str))
@@ -184,32 +180,38 @@ The values are `double' arrays with one value per individual."
                1))))
       ((null? lst) false-count)))
 
-(define* (useful-snps geno.txt pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
-  (let* ((lines (read-separated-lines geno.txt))
-         (useful-inds (useful-individuals pheno.txt))
-         (useful-snp-table (make-hash-table)))
-    (do ((lines lines (cdr lines)))
-        ((null? lines))
-      (let* ((row (car lines))
-             (name (first row))
-             (inds (map string->number (cdddr row)))
-             (ind-count (length inds))
-             (maf (do ((inds inds (cdr inds))
-                       (useful-inds useful-inds
-                                    (cdr useful-inds))
+(define* (useful-snps genotypes-mtx markers pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
+  (let* ((useful-inds (useful-individuals pheno.txt))
+         (ind-count (length useful-inds))
+         (useful-snp-table (make-hash-table))
+         (mtx-rows (mtx:rows genotypes-mtx))
+         (mtx-cols (mtx:columns genotypes-mtx)))
+    (format #t "Useful individuals are ~s~%" useful-inds)
+    (do ((row 0 (1+ row))
+         (markers markers (cdr markers)))
+        ((= row mtx-rows))
+      (let* ((name (car markers))
+             (ind 0) ;; To allow using it in do for maf
+             (maf (do ((ind ind (1+ ind))
+                       (useful-inds useful-inds (cdr useful-inds))
                        (maf (if (car useful-inds)
-                                (car inds)
+                                (mtx:get genotypes-mtx row ind)
                                 0)
-                            (+ maf (if (car useful-inds)
-                                       (car inds)
-                                       0))))
-                      ((null? inds) maf)))
-             (miss-count (count-false inds))
+                            (if (car useful-inds)
+                                (+ maf (mtx:get genotypes-mtx row ind))
+                                maf)))
+                      ((= ind mtx-cols) maf)))
+             (miss-count (do ((ind 0 (1+ ind))
+                              (nans 0 (if (nan? (mtx:get genotypes-mtx row ind))
+                                          (1+ nans)
+                                          nans)))
+                             ((= ind mtx-cols) nans)))
              (maf (/ maf (* 2 (- ind-count miss-count)))))
         (when (and (< (/ miss-count ind-count) miss-level)
                    (< maf-level maf (- 1 maf-level)))
           (hash-set! useful-snp-table name #t))))
     useful-snp-table))
+
 
 (define memcpy
   (foreign-library-function
@@ -234,24 +236,67 @@ The values are `double' arrays with one value per individual."
               ;; Markers x individuals
               (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                    individuals))
-              (set! tmp-vec (vec:alloc individuals 0))
-              (set! markers (cons (mdb:val-data-string key) markers))))
+              (set! tmp-vec (vec:alloc individuals 0))))
           (memcpy (vec:ptr tmp-vec 0) (mdb:val-data data) (mdb:val-size data))
-          (cleanup-vector tmp-vec)
+          (set! markers (cons (mdb:val-data-string key) markers))
           (mtx:vec->row! tmp-vec mtx line-idx)
           (set! line-idx (1+ line-idx)))))
      #:mapsize (* 40 10485760))
     (when tmp-vec
       (vec:free tmp-vec))
-    (list (or mtx
-              (mtx:alloc 0 0 0))
+    (list (or mtx (mtx:alloc 0 0 0))
           (reverse! markers))))
+
+(define (geno.txt->genotypes-mtx geno.txt)
+  "Convert GENO.TXT-FILE to a proper genotype matrix
+Return a (MATRIX MARKER-NAMES) list."
+  (let* ((lines (read-separated-lines geno.txt))
+         (mtx (mtx:alloc (length lines) (length (first lines)) +nan.0)))
+    (do ((row 0 (1+ row))
+         (lines lines (cdr lines)))
+        ((null? lines))
+      (do ((col 0 (1+ col))
+           ;; cdddar: the elements starting from the third of the
+           ;; current line.
+           (inds (cdddar lines) (cdr inds)))
+          ((null? inds))
+        (let ((ind (string->number (first inds))))
+          (when ind
+            (mtx:set! mtx row col ind)))))
+    (list mtx (map first lines))))
+
+(define (cleanup-mtx mtx)
+  (do ((mtx-rows (mtx:rows mtx))
+       (mtx-cols (mtx:columns mtx))
+       (row 0 (1+ row)))
+      ((= row mtx-rows))
+    (match (do ((col 0 (1+ col))
+                (is-nan? (nan? (mtx:get mtx row 0))
+                         (nan? (mtx:get mtx row col)))
+                (sum 0 (if is-nan?
+                           sum
+                           (+ sum (mtx:get mtx row col))))
+                (nans '() (if is-nan?
+                              (cons col nans)
+                              nans)))
+               ((= col mtx-cols)
+                (list sum nans)))
+      ((sum nans)
+       (let ((mean (/ sum (- mtx-cols (length nans)))))
+         (do ((nans nans (cdr nans)))
+             ((null? nans))
+           (mtx:set! mtx row (car nans) mean))
+         (do ((col 0 (1+ col)))
+             ((= col mtx-cols))
+           (mtx:set! mtx row col (- (mtx:get mtx row col) mean))))))))
 
 (define (kinship-mtx mtx n-useful-snps)
   "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
     (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
+    (format #t "The first element is ~a~%" (mtx:get result 0 0))
     (mtx:scale! result (/ 1 n-useful-snps))
+    (format #t "The first element is ~a~%" (mtx:get result 0 0))
     result))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
@@ -316,10 +361,14 @@ The values are `double' arrays with one value per individual."
 ;; (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/BXD_mouse.cXX.txt")
 
 (define (kmain geno.txt pheno.txt lmdb-dir)
-  (let* ((meta (geno.txt->lmdb geno.txt lmdb-dir))
-         (useful-snps (useful-snps geno.txt pheno.txt))
-         (mtx (first (lmdb->genotypes-mtx lmdb-dir))))
-    (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))
+  (geno.txt->lmdb geno.txt lmdb-dir)
+  (match (lmdb->genotypes-mtx lmdb-dir)
+    ((mtx markers)
+     (let ((useful-snps (useful-snps mtx markers pheno.txt)))
+       (format #t "The first element is ~a~%" (mtx:get mtx 0 0))
+       (cleanup-mtx mtx)
+       (format #t "The first element is ~a~%" (mtx:get mtx 0 0))
+       (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))))
 
 ;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
 ;; (define lmdb-dir "/tmp/lmdb-bxd/")
