@@ -304,18 +304,19 @@ Return a (MATRIX MARKER-NAMES) list."
   (mdb:with-env-and-txn
    (lmdb-dir)
    (env txn)
-   (let ((dbi (mdb:dbi-open txn))
-         (rows (mtx:rows kinship-mtx))
-         (row-size (* (sizeof double) (mtx:columns kinship-mtx)))
-         (int-size (sizeof unsigned-int)))
+   (let* ((dbi (mdb:dbi-open txn))
+          (rows (mtx:rows kinship-mtx))
+          (double-size (sizeof double))
+          (row-size (* double-size (mtx:columns kinship-mtx)))
+          (uint-size (sizeof unsigned-int)))
      (do ((row 0 (1+ row)))
          ((= row rows))
        (mdb:put!
         txn dbi
         (mdb:make-val (make-c-struct (list unsigned-int) (list row))
-                      int-size)
-        (mdb:make-val (mtx:ptr kinship-mtx row 0)
-                      row-size))))))
+                      uint-size)
+        (mdb:make-val (mtx:ptr kinship-mtx row row)
+                      (- row-size (* double-size row))))))))
 
 (define (lmdb->kinship lmdb-dir)
   (let ((mtx #f))
@@ -326,11 +327,18 @@ Return a (MATRIX MARKER-NAMES) list."
       cursor
       (lambda (key value)
         (unless mtx
-          (set! mtx (mtx:alloc (/ (mdb:val-size value) (sizeof double))
-                               (/ (mdb:val-size value) (sizeof double)))))
-        (memcpy (mtx:ptr mtx (first (mdb:val-data-parse key (list unsigned-int))) 0)
-                (mdb:val-data value)
-                (mdb:val-size value)))))
+          (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
+                               (mdb:stat-entries (mdb:dbi-stat txn dbi))
+                               +nan.0)))
+        (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
+          (memcpy (mtx:ptr mtx row row)
+                  (mdb:val-data value)
+                  (mdb:val-size value))))))
+    (mtx:for-each
+     (lambda (row column value)
+       (when (nan? value)
+         (mtx:set! mtx row column (mtx:get mtx column row))))
+     mtx)
     mtx))
 
 (define (kinship->cxx.txt kinship-mtx cxx.txt)
