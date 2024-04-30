@@ -187,7 +187,6 @@ The values are `double' arrays with one value per individual."
          (useful-snp-table (make-hash-table))
          (mtx-rows (mtx:rows genotypes-mtx))
          (mtx-cols (mtx:columns genotypes-mtx)))
-    (format #t "Useful individuals are ~s~%" useful-inds)
     (do ((row 0 (1+ row))
          (markers markers (cdr markers)))
         ((= row mtx-rows))
