@@ -116,7 +116,7 @@ Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
 The values are `double' arrays with one value per individual."
   (let ((lines (read-separated-lines geno.txt-file))
-        (double-size (sizeof double)))
+        (float-size (sizeof float)))
     (unless (file-exists? (string-append lmdb-dir "data.mdb"))
       (mdb:call-with-wrapped-cursor
        lmdb-dir #f
@@ -129,9 +129,9 @@ The values are `double' arrays with one value per individual."
                     (let* ((values (cdddr (first lines)))
                            (values-len (length values)))
                       (mdb:make-val (make-c-struct
-                                     (make-list values-len double)
+                                     (make-list values-len float)
                                      (map string->num/nan values))
-                                    (* values-len double-size)))
+                                    (* values-len float-size)))
                     mdb:+noodupdata+)))
        #:mapsize (* 40 10485760)))
     (list (- (length (car lines)) 3)
@@ -224,22 +224,25 @@ The values are `double' arrays with one value per individual."
   (let* ((mtx #f)
          (tmp-vec #f)
          (line-idx 0)
-         (markers (list)))
+         (markers (list))
+         (float-size (sizeof float)))
     (mdb:call-with-wrapped-cursor
      lmdb-dir #f
      (lambda (env txn dbi cursor)
        (mdb:for-cursor
         cursor
         (lambda (key data)
-          (unless mtx
-            (let ((individuals (/ (mdb:val-size data) (sizeof double))))
+          (let ((individuals (/ (mdb:val-size data) float-size)))
+            (unless mtx
               ;; Markers x individuals
               (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
-                                   individuals))
-              (set! tmp-vec (vec:alloc individuals 0))))
-          (memcpy (vec:ptr tmp-vec 0) (mdb:val-data data) (mdb:val-size data))
+                                   individuals)))
+            (do ((i 0 (1+ i))
+                 (inds (mdb:val-data-parse data (make-list individuals float))
+                       (cdr inds)))
+                ((= i individuals))
+              (mtx:set! mtx line-idx i (car inds))))
           (set! markers (cons (mdb:val-data-string key) markers))
-          (mtx:vec->row! tmp-vec mtx line-idx)
           (set! line-idx (1+ line-idx)))))
      #:mapsize (* 40 10485760))
     (when tmp-vec
@@ -306,17 +309,28 @@ Return a (MATRIX MARKER-NAMES) list."
    (env txn)
    (let* ((dbi (mdb:dbi-open txn))
           (rows (mtx:rows kinship-mtx))
-          (double-size (sizeof double))
-          (row-size (* double-size (mtx:columns kinship-mtx)))
+          (float-size (sizeof float))
+          (row-size (* float-size (mtx:columns kinship-mtx)))
           (uint-size (sizeof unsigned-int)))
-     (do ((row 0 (1+ row)))
+     (do ((row 0 (1+ row))
+          (row-size (* float-size (mtx:columns kinship-mtx))
+                    (- row-size float-size)))
          ((= row rows))
        (mdb:put!
         txn dbi
         (mdb:make-val (make-c-struct (list unsigned-int) (list row))
                       uint-size)
-        (mdb:make-val (mtx:ptr kinship-mtx row row)
-                      (- row-size (* double-size row))))))))
+        (mdb:make-val
+         (make-c-struct
+          (make-list (/ row-size float-size) float)
+          (let rec ((offset 0)
+                    (col row))
+            (if (= offset row-size)
+                '()
+                (cons (mtx:get kinship-mtx row col)
+                      (rec (+ offset float-size)
+                           (1+ col))))))
+         row-size))))))
 
 (define (lmdb->kinship lmdb-dir)
   (let ((mtx #f))
@@ -331,9 +345,13 @@ Return a (MATRIX MARKER-NAMES) list."
                                (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                +nan.0)))
         (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
-          (memcpy (mtx:ptr mtx row row)
-                  (mdb:val-data value)
-                  (mdb:val-size value))))))
+          (do ((col row (1+ col))
+               (data (mdb:val-data-parse
+                      value
+                      (make-list (- (mtx:rows mtx) row) float))
+                     (cdr data)))
+              ((= col (mtx:columns mtx)))
+            (mtx:set! mtx row col (car data)))))))
     (mtx:for-each
      (lambda (row column value)
        (when (nan? value)
