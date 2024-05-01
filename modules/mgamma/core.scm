@@ -13,6 +13,7 @@
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
+  #:use-module (json)
   #:export (geno.txt->lmdb
             geno.txt->genotypes-mtx
             lmdb->genotypes-mtx
@@ -122,6 +123,11 @@ The values are `double' arrays with one value per individual."
        lmdb-dir #f
        (lambda (env txn dbi cursor)
          (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
+         (mdb:put txn dbi
+                  (mdb:make-val (string->pointer "meta" "UTF-8") 4)
+                  (scm->json-string `(("type" . "geno")
+                                      ("version" . "0.0.1")
+                                      ("float" . #t))))
          (do ((lines lines (cdr lines)))
              ((null? lines))
            (mdb:put txn dbi
@@ -219,36 +225,46 @@ The values are `double' arrays with one value per individual."
    #:return-type '*
    #:arg-types (list '* '* size_t)))
 
+(define (pointer=? ptr1 ptr2 size)
+  (bytevector=? (pointer->bytevector ptr1 size)
+                (pointer->bytevector ptr2 size)))
+
 (define* (lmdb->genotypes-mtx lmdb-dir)
   "Read the data from LMDB-DIR and convert it to GSL matrix."
   (let* ((mtx #f)
          (tmp-vec #f)
          (line-idx 0)
          (markers (list))
-         (float-size (sizeof float)))
+         (float-size (sizeof float))
+         (meta #f))
     (mdb:call-with-wrapped-cursor
      lmdb-dir #f
      (lambda (env txn dbi cursor)
        (mdb:for-cursor
         cursor
         (lambda (key data)
-          (let ((individuals (/ (mdb:val-size data) float-size)))
+          (let ((individuals (/ (mdb:val-size data) float-size))
+                (meta? (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)))
             (unless mtx
               ;; Markers x individuals
               (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                    individuals)))
-            (do ((i 0 (1+ i))
-                 (inds (mdb:val-data-parse data (make-list individuals float))
-                       (cdr inds)))
-                ((= i individuals))
-              (mtx:set! mtx line-idx i (car inds))))
-          (set! markers (cons (mdb:val-data-string key) markers))
-          (set! line-idx (1+ line-idx)))))
+            (if meta?
+                (set! meta (json-string->scm (mdb:val-data-string data)))
+                (do ((i 0 (1+ i))
+                     (inds (mdb:val-data-parse data (make-list individuals float))
+                           (cdr inds)))
+                    ((= i individuals))
+                  (mtx:set! mtx line-idx i (car inds))))
+            (unless meta?
+              (set! markers (cons (mdb:val-data-string key) markers))
+              (set! line-idx (1+ line-idx)))))))
      #:mapsize (* 40 10485760))
     (when tmp-vec
       (vec:free tmp-vec))
     (list (or mtx (mtx:alloc 0 0 0))
-          (reverse! markers))))
+          (reverse! markers)
+          meta)))
 
 (define (geno.txt->genotypes-mtx geno.txt)
   "Convert GENO.TXT-FILE to a proper genotype matrix
@@ -316,6 +332,12 @@ Return a (MATRIX MARKER-NAMES) list."
           (row-size (* float-size (mtx:columns kinship-mtx))
                     (- row-size float-size)))
          ((= row rows))
+       (mdb:put txn dbi
+                (mdb:make-val (string->pointer "meta" "UTF-8") 4)
+                (scm->json-string `(("type" . "GRM")
+                                    ("version" . "0.0.1")
+                                    ("float" . #t)
+                                    ("symmetric" . #t))))
        (mdb:put!
         txn dbi
         (mdb:make-val (make-c-struct (list unsigned-int) (list row))
@@ -344,14 +366,15 @@ Return a (MATRIX MARKER-NAMES) list."
           (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                (mdb:stat-entries (mdb:dbi-stat txn dbi))
                                +nan.0)))
-        (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
-          (do ((col row (1+ col))
-               (data (mdb:val-data-parse
-                      value
-                      (make-list (- (mtx:rows mtx) row) float))
-                     (cdr data)))
-              ((= col (mtx:columns mtx)))
-            (mtx:set! mtx row col (car data)))))))
+        (unless (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)
+          (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
+            (do ((col row (1+ col))
+                 (data (mdb:val-data-parse
+                        value
+                        (make-list (- (mtx:rows mtx) row) float))
+                       (cdr data)))
+                ((= col (mtx:columns mtx)))
+              (mtx:set! mtx row col (car data))))))))
     (mtx:for-each
      (lambda (row column value)
        (when (nan? value)

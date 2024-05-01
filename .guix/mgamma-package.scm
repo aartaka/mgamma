@@ -56,6 +56,7 @@
     (native-inputs (list guile-3.0))
     (inputs (list bash
                   guile-3.0
+                  guile-json-4
                   guile-lmdb-git
                   guile-gsl-git))
     (home-page "https://github.com/aartaka/guile-gemma")
