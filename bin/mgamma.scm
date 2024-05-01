@@ -125,7 +125,7 @@ mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno
 Usage: mgamma command [options...]
 
 Valid commands:
- convert:  Convert the text files for --kinship of --geno to LMDB versions and back.
+ convert:  Convert the text files for --kinship or --geno to LMDB versions and back.
  kinship:  Calculate kinship matrix for --geno and --pheno.
  gwa:      Run LMM9 on the --kinship matrix and --geno/--pheno files.
 
