@@ -14,7 +14,8 @@
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (json)
-  #:export (geno.txt->lmdb
+  #:export (mapsize
+            geno.txt->lmdb
             geno.txt->genotypes-mtx
             lmdb->genotypes-mtx
             kinship-mtx
@@ -26,6 +27,8 @@
             useful-individuals
             cleanup-mtx
             kmain))
+
+(define mapsize (make-parameter (* 1000000 10485760)))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
 ;; TODO: Apply PEG to a whole file?
@@ -139,7 +142,7 @@ The values are `double' arrays with one value per individual."
                                      (map string->num/nan values))
                                     (* values-len float-size)))
                     mdb:+noodupdata+)))
-       #:mapsize (* 40 10485760)))
+       #:mapsize (mapsize)))
     (list (- (length (car lines)) 3)
           (map car lines))))
 
@@ -259,7 +262,7 @@ The values are `double' arrays with one value per individual."
             (unless meta?
               (set! markers (cons (mdb:val-data-string key) markers))
               (set! line-idx (1+ line-idx)))))))
-     #:mapsize (* 40 10485760))
+     #:mapsize (mapsize))
     (when tmp-vec
       (vec:free tmp-vec))
     (list (or mtx (mtx:alloc 0 0 0))
@@ -352,12 +355,13 @@ Return a (MATRIX MARKER-NAMES) list."
                 (cons (mtx:get kinship-mtx row col)
                       (rec (+ offset float-size)
                            (1+ col))))))
-         row-size))))))
+         row-size))))
+   #:mapsize (mapsize)))
 
 (define (lmdb->kinship lmdb-dir)
   (let ((mtx #f))
     (mdb:with-wrapped-cursor
-     (lmdb-dir #f)
+     (lmdb-dir #f #:mapsize (mapsize))
      (env txn dbi cursor)
      (mdb:for-cursor
       cursor
