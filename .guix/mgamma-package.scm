@@ -42,17 +42,13 @@
                              (bash (string-append (assoc-ref inputs "bash")
                                                   "/bin/bash"))
                              (self (string-append (assoc-ref outputs "out")
-                                                  "/share/guile/site/3.0"))
-                             (gsl (string-append (assoc-ref inputs "guile-gsl-git")
-                                                 "/share/guile/site/3.0"))
-                             (lmdb (string-append (assoc-ref inputs "guile-lmdb-git")
                                                   "/share/guile/site/3.0")))
                         (mkdir-p bin)
                         (copy-file "bin/mgamma" real)
                         (wrap-program real #:sh bash
                                       ;; For better backtraces.
                                       (list "COLUMNS" ":" '= (list "1000"))
-                                      (list "GUILE_LOAD_PATH" ":" '= (list gsl lmdb self)))))))))
+                                      (list "GUILE_LOAD_PATH" ":" '= (list self (getenv "GUILE_LOAD_PATH"))))))))))
     (native-inputs (list guile-3.0))
     (inputs (list bash
                   guile-3.0
