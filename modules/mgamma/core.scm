@@ -369,8 +369,9 @@ Return a (MATRIX MARKER-NAMES) list."
       cursor
       (lambda (key value)
         (unless mtx
-          (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
-                               (mdb:stat-entries (mdb:dbi-stat txn dbi))
+          ;; 1- because there's meta record in addition to data.
+          (set! mtx (mtx:alloc (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
+                               (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
                                +nan.0)))
         (unless (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)
           (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
