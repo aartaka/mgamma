@@ -24,7 +24,7 @@
     (anno    (single-char #\a) (value #t) (predicate ,file-exists?))
     (covar   (single-char #\c) (value #t) (predicate ,file-exists?))
     (maf                       (value #t) (predicate ,string->number))
-    (map-size                  (value #t) (predicate ,string->number))
+    (map-size                  (value #t))
     (output  (single-char #\o) (value #t))))
 
 (define (mdb-file? file)
@@ -72,6 +72,15 @@ kinship lmdb -> txt     [--map-size 10000000] --kinship data.mdb --output kinshi
       (rename-file (string-append (dirname output) "/data.mdb")
                    output))))
 
+(define (suffixed-string->number string)
+  (* (or (string->number string)
+         (string->number (substring string 0 (1- (string-length string)))))
+     (cond
+      ((string-suffix-ci? "K" string) 1000)
+      ((string-suffix-ci? "M" string) 1000000)
+      ((string-suffix-ci? "G" string) 1000000000)
+      (else 1))))
+
 (define (kinship options)
   (unless (option-ref options 'help #f)
     (ensure-options options 'output 'geno 'pheno))
@@ -84,8 +93,9 @@ kinship lmdb -> txt     [--map-size 10000000] --kinship data.mdb --output kinshi
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
 mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%"))
      (else
-      (when (option-ref options 'map-size #f)
-        (mapsize (string->number (option-ref options 'map-size #f))))
+      (let ((map-size (option-ref options 'map-size #f)))
+        (when map-size
+          (mapsize (suffixed-string->number map-size))))
       (let* ((geno (option-ref options 'geno #f))
              (geno-txt? (txt-file? geno)))
         (match (if geno-txt?
