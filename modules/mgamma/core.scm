@@ -333,7 +333,7 @@ Return a (MATRIX MARKER-NAMES) list."
         ((> initial-row rows))
       (let* ((txn (mdb:txn-begin env))
              (dbi (mdb:dbi-open txn)))
-        (unless (positive? (mdb:val-size (mdb:get txn dbi "meta")))
+        (when (zero? (mdb:stat-entries (mdb:dbi-stat txn dbi)))
           (mdb:put txn dbi
                    (mdb:make-val (string->pointer "meta" "UTF-8") 4)
                    (scm->json-string `(("type" . "GRM")
