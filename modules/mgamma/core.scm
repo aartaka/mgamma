@@ -28,7 +28,7 @@
             cleanup-mtx
             kmain))
 
-(define mapsize (make-parameter (* 1000000 10485760)))
+(define mapsize (make-parameter (* 100 10485760)))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
 ;; TODO: Apply PEG to a whole file?
@@ -323,40 +323,42 @@ Return a (MATRIX MARKER-NAMES) list."
     result))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
-  (mdb:with-env-and-txn
-   (lmdb-dir)
-   (env txn)
-   (let* ((dbi (mdb:dbi-open txn))
-          (rows (mtx:rows kinship-mtx))
-          (float-size (sizeof float))
-          (row-size (* float-size (mtx:columns kinship-mtx)))
-          (uint-size (sizeof unsigned-int)))
-     (do ((row 0 (1+ row))
-          (row-size (* float-size (mtx:columns kinship-mtx))
-                    (- row-size float-size)))
-         ((= row rows))
-       (mdb:put txn dbi
-                (mdb:make-val (string->pointer "meta" "UTF-8") 4)
-                (scm->json-string `(("type" . "GRM")
-                                    ("version" . "0.0.1")
-                                    ("float" . #t)
-                                    ("symmetric" . #t))))
-       (mdb:put!
-        txn dbi
-        (mdb:make-val (make-c-struct (list unsigned-int) (list row))
-                      uint-size)
-        (mdb:make-val
-         (make-c-struct
-          (make-list (/ row-size float-size) float)
-          (let rec ((offset 0)
-                    (col row))
-            (if (= offset row-size)
-                '()
-                (cons (mtx:get kinship-mtx row col)
-                      (rec (+ offset float-size)
-                           (1+ col))))))
-         row-size))))
-   #:mapsize (mapsize)))
+  (let ((env (mdb:env-create #:mapsize (mapsize)))
+        (float-size (sizeof float))
+        (uint-size (sizeof unsigned-int))
+        (rows (mtx:rows kinship-mtx)))
+    (mdb:env-open env lmdb-dir)
+    (do ((row-step 1 (1+ row-step))
+         (initial-row 0 (+ initial-row row-step)))
+        ((> initial-row rows))
+      (let* ((txn (mdb:txn-begin env))
+             (dbi (mdb:dbi-open txn)))
+        (unless (positive? (mdb:val-size (mdb:get txn dbi "meta")))
+          (mdb:put txn dbi
+                   (mdb:make-val (string->pointer "meta" "UTF-8") 4)
+                   (scm->json-string `(("type" . "GRM")
+                                       ("version" . "0.0.1")
+                                       ("float" . #t)
+                                       ("symmetric" . #t)))))
+        (do ((row initial-row (1+ row))
+             (row-size (* float-size (- rows initial-row))
+                       (- row-size float-size)))
+            ((or (= row rows)
+                 (= row (+ initial-row row-step))))
+          (mdb:put!
+           txn dbi
+           (mdb:make-val (make-c-struct (list unsigned-int) (list row))
+                         uint-size)
+           (mdb:make-val
+            (make-c-struct
+             (make-list (- rows row) float)
+             (let rec ((col row))
+               (if (= col rows)
+                   '()
+                   (cons (mtx:get kinship-mtx row col)
+                         (rec (1+ col))))))
+            row-size)))
+        (mdb:txn-commit txn)))))
 
 (define (lmdb->kinship lmdb-dir)
   (let ((mtx #f))
