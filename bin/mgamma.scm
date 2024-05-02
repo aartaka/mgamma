@@ -91,7 +91,7 @@ mgamma kinship [--maf 0.1] [--map-size 10M] --geno geno.(lmdb|txt) --pheno pheno
                    (lmdb->genotypes-mtx (dirname geno)))
           ((geno-mtx markers)
            (let* ((useful-snps (useful-snps geno-mtx markers (option-ref options 'pheno #f)
-                                            #:maf-level (or (option-ref options 'geno #f)
+                                            #:maf-level (or (string->number (option-ref options 'maf ""))
                                                             0.01)))
                   (_ (cleanup-mtx geno-mtx))
                   (kin-mtx (kinship-mtx geno-mtx (hash-count (cut or #t <> <>) useful-snps))))
