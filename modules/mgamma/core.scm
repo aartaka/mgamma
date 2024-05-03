@@ -416,19 +416,3 @@ Return a (MATRIX MARKER-NAMES) list."
     result))
 
 ;; (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/BXD_mouse.cXX.txt")
-
-(define (kmain geno.txt pheno.txt lmdb-dir)
-  (geno.txt->lmdb geno.txt lmdb-dir)
-  (match (lmdb->genotypes-mtx lmdb-dir)
-    ((mtx markers)
-     (let ((useful-snps (useful-snps mtx markers pheno.txt)))
-       (kinship-mtx mtx (hash-count (cut or #t <> <>) useful-snps))))))
-
-;; (define kin (kmain "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt" "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt" "/tmp/lmdb-hs/"))
-;; (define lmdb-dir "/tmp/lmdb-bxd/")
-;; (define geno.txt "/home/aartaka/git/GEMMA/example/BXD_geno.txt")
-;; (define pheno.txt "/home/aartaka/git/GEMMA/example/BXD_pheno.txt")
-;; (define meta (geno.txt->lmdb geno.txt lmdb-dir))
-;; (define useful-snps-table (useful-snps geno.txt pheno.txt))
-;; (define mtx (lmdb->genotypes-mtx lmdb-dir (second meta) (first meta)))
-;; (define kin (kinship mtx (hash-count (cut or #t <> <>) useful-snps-table)))
