@@ -25,8 +25,7 @@
             cxx.txt->kinship
             useful-snps
             useful-individuals
-            cleanup-mtx
-            kmain))
+            cleanup-mtx))
 
 (define mapsize (make-parameter (* 100 10485760)))
 
