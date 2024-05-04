@@ -175,7 +175,7 @@ The values are `double' arrays with one value per individual."
                (cons (not (string-na? (caar lines)))
                      inds)))
         ((null? lines)
-         (reverse inds)))))
+         (reverse! inds)))))
 
 (define (count-false lst)
   (do ((lst lst (cdr lst))
