@@ -6,9 +6,12 @@
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-26)
   #:use-module (srfi srfi-43)
+  #:use-module ((gsl core) #:prefix gsl:)
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl vectors) #:prefix vec:)
-  #:use-module (gsl blas)
+  #:use-module ((gsl eigensystems) #:prefix eigen:)
+  #:use-module ((gsl blas) #:prefix blas:)
+  #:use-module ((gsl root) #:prefix root:)
   #:use-module (system foreign)
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
@@ -23,6 +26,8 @@
             kinship->lmdb
             lmdb->kinship
             cxx.txt->kinship
+            pheno.txt->pheno-mtx
+            covariates.txt->cvt-mtx
             useful-snps
             useful-individuals
             cleanup-mtx))
@@ -155,14 +160,20 @@ The values are `double' arrays with one value per individual."
 (define (string-na? str)
   (string= "NA" str))
 
-(define (useful-individuals pheno.txt)
-  (let ((lines (read-separated-lines pheno.txt)))
-    (do ((lines lines (cdr lines))
-         (inds (list (not (string-na? (caar lines))))
-               (cons (not (string-na? (caar lines)))
-                     inds)))
-        ((null? lines)
-         (reverse! inds)))))
+(define (useful-individuals pheno-mtx cvt-mtx)
+  (let* ((inds (do ((ind 0 (1+ ind))
+                    (inds (list (nan? (mtx:get pheno-mtx 0 0)))
+                          (cons (nan? (mtx:get pheno-mtx ind 0))
+                                inds)))
+                   ((= ind (mtx:rows pheno-mtx))
+                    (reverse! inds)))))
+    (when cvt-mtx
+      (do ((inds inds (cdr inds))
+           (cvt 0 (1+ cvt)))
+          ((null? inds))
+        (when (zero? (mtx:get cvt-mtx cvt 0))
+          (set-car! inds #f))))
+    inds))
 
 (define (count-false lst)
   (do ((lst lst (cdr lst))
@@ -176,8 +187,8 @@ The values are `double' arrays with one value per individual."
                1))))
       ((null? lst) false-count)))
 
-(define* (useful-snps genotypes-mtx markers pheno.txt #:key (miss-level 0.05) (maf-level 0.01))
-  (let* ((useful-inds (useful-individuals pheno.txt))
+(define* (useful-snps genotypes-mtx markers pheno-mtx covariates-mtx #:key (miss-level 0.05) (maf-level 0.01))
+  (let* ((useful-inds (useful-individuals pheno-mtx covariates-mtx))
          (ind-count (length useful-inds))
          (useful-snp-table (make-hash-table))
          (mtx-rows (mtx:rows genotypes-mtx))
@@ -304,7 +315,7 @@ Return a (MATRIX MARKER-NAMES) list."
   "Calculate the kinship matrix for genotype MTX."
   (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
     (cleanup-mtx mtx)
-    (dgemm! mtx mtx result #:beta 0 #:transpose-a +trans+)
+    (blas:dgemm! mtx mtx result #:beta 0 #:transpose-a blas:+trans+)
     (mtx:scale! result (/ 1 n-useful-snps))
     result))
 
@@ -387,8 +398,8 @@ Return a (MATRIX MARKER-NAMES) list."
            (format port "~f " value))
          kinship-mtx)))))
 
-(define (cxx.txt->kinship cxx.txt)
-  (let* ((lines (read-separated-lines cxx.txt))
+(define (txt->mtx file.txt)
+  (let* ((lines (read-separated-lines file.txt))
          (lines-len (length lines))
          (line-len (length (first lines)))
          (result (mtx:alloc lines-len line-len)))
@@ -398,7 +409,15 @@ Return a (MATRIX MARKER-NAMES) list."
       (do ((column-idx 0 (1+ column-idx))
            (column (first row) (cdr column)))
           ((= column-idx line-len))
-        (mtx:set! result row-idx column-idx (string->number (first column)))))
+        (mtx:set! result row-idx column-idx (string->num/nan (first column)))))
     result))
 
+(define (cxx.txt->kinship cxx.txt)
+  (txt->mtx cxx.txt))
+
+(define (pheno.txt->pheno-mtx pheno.txt)
+  (txt->mtx pheno.txt))
+
+(define (covariates.txt->cvt-mtx covariates.txt)
+  (txt->mtx covariates.txt))
 ;; (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/BXD_mouse.cXX.txt")
