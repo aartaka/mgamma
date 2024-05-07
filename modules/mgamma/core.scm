@@ -100,19 +100,6 @@ Return a list of lists of values."
       +nan.0
       (string->number str)))
 
-(define (read-anno.txt file)
-  (let ((lines (read-separated-lines file)))
-    (map (lambda (split)
-           (match split
-             ((marker pos chromosome unidentified?)
-              (list marker
-                    (string->num/nan pos)
-                    (string->number chromosome)
-                    (string->number unidentified?)))))
-         lines)))
-
-;; (read-anno.txt "/home/aartaka/git/GEMMA/example/mouse_hs1940.anno.txt")
-
 (define (geno.txt->lmdb geno.txt-file lmdb-dir)
   "Convert GENO.TXT-FILE to an LMDB-DIR-located database.
 Useful to speed up genotype matrix manipulation.
