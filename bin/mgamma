@@ -107,7 +107,7 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
                                             #:maf-level (or (string->number (option-ref options 'maf ""))
                                                             0.01)))
                   (_ (cleanup-mtx geno-mtx))
-                  (kin-mtx (kinship-mtx geno-mtx (hash-count (cut or #t <> <>) useful-snps))))
+                  (kin-mtx (kinship-mtx geno-mtx markers useful-snps)))
              (if txt-out?
                  (kinship->cxx.txt kin-mtx output)
                  (kinship->lmdb kin-mtx (dirname output)))))))))
