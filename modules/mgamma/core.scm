@@ -949,15 +949,15 @@ Return a (MATRIX MARKER-NAMES) list."
                                           (root:root polisher))))
                                      (logf-l (log-l-f l)))
                                 (cond
-                                 ((and (nan? lambda)
+                                 ((and (nan? lam)
                                        (nan? logf))
                                   (rec (cdr sign-changes) l logf-l))
                                  ((< logf logf-l)
                                   (rec (cdr sign-changes) l logf-l))
                                  (else
-                                  (rec (cdr sign-changes) lambda logf))))
-                              (rec (cdr sign-changes) lambda logf)))
-                         (rec (cdr sign-changes) lambda logf))))))))))))
+                                  (rec (cdr sign-changes) lam logf))))
+                              (rec (cdr sign-changes) lam logf)))
+                         (rec (cdr sign-changes) lam logf))))))))))))
 
 (define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
   (let* ((cvt-mtx (or cvt-mtx
