@@ -171,7 +171,7 @@ The values are `double' arrays with one value per individual."
                     (inds '()
                           (cons (not (nan? (mtx:get pheno-mtx ind 0)))
                                 inds)))
-                   ((= ind (1- (mtx:rows pheno-mtx)))
+                   ((= ind (mtx:rows pheno-mtx))
                     (reverse! inds)))))
     (when (and cvt-mtx
                (positive? (mtx:cols cvt-mtx)))
