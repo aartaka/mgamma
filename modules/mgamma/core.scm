@@ -318,13 +318,29 @@ Return a (MATRIX MARKER-NAMES) list."
              ((= col mtx-cols))
            (mtx:set! mtx row col (- (mtx:get mtx row col) mean))))))))
 
-(define (kinship-mtx mtx n-useful-snps)
-  "Calculate the kinship matrix for genotype MTX."
-  (let ((result (mtx:alloc (mtx:columns mtx) (mtx:columns mtx) 0)))
-    (cleanup-mtx mtx)
-    (blas:dgemm! mtx mtx result #:beta 0 #:transpose-a blas:+trans+)
-    (mtx:scale! result (/ 1 n-useful-snps))
-    result))
+(define (kinship-mtx geno-mtx markers useful-snps)
+  "Calculatep the kinship matrix for genotype MTX."
+  (let* ((n-useful-snps (hash-count (cut or #t <> <>) useful-snps))
+         ;; Because we need to sort the useful SNPs into their own matrix.
+         (intermediate-mtx (mtx:alloc n-useful-snps (mtx:columns geno-mtx)))
+         (tmp-vec (vec:alloc (mtx:columns geno-mtx) 0)))
+    (do ((i 0 (1+ i))
+         (result-i 0 (if (hash-ref useful-snps (car markers))
+                         (1+ result-i)
+                         result-i))
+         (markers markers (cdr markers)))
+        ((null? markers))
+      (when (hash-ref useful-snps (car markers))
+        (mtx:row->vec! geno-mtx i tmp-vec)
+        (mtx:vec->row! tmp-vec intermediate-mtx result-i)))
+    (format #t "Original matrix is ~s, intermediate matrix is ~s"
+            geno-mtx intermediate-mtx)
+    (cleanup-mtx intermediate-mtx)
+    (let ((result (blas:gemm intermediate-mtx intermediate-mtx #:transpose-a blas:+trans+)))
+      (mtx:scale! result (/ 1 n-useful-snps))
+      (mtx:free intermediate-mtx)
+      (vec:free tmp-vec)
+      result)))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
   (let ((env (mdb:env-create #:mapsize (mapsize)))
