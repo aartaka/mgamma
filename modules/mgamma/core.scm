@@ -321,8 +321,6 @@ Return a (MATRIX MARKER-NAMES) list."
       (when (hash-ref useful-snps (car markers))
         (mtx:row->vec! geno-mtx i tmp-vec)
         (mtx:vec->row! tmp-vec intermediate-mtx result-i)))
-    (format #t "Original matrix is ~s, intermediate matrix is ~s"
-            geno-mtx intermediate-mtx)
     (cleanup-mtx intermediate-mtx)
     (let ((result (blas:gemm intermediate-mtx intermediate-mtx #:transpose-a blas:+trans+)))
       (mtx:scale! result (/ 1 n-useful-snps))
@@ -911,57 +909,71 @@ Return a (MATRIX MARKER-NAMES) list."
            (let rec ((sign-changes sign-changes)
                      (lam +nan.0)
                      (logf +nan.0))
-             (if (null? sign-changes)
-                 (list lam logf)
-                 (match (car sign-changes)
-                   ((lambda-l lambda-h)
-                    ;; Allocating a new solver every time. Wasteful?
-                    ;; GEMMA uses root:set! instead.
-                    (root:with
-                     (solver root:+brent-solver+
-                             #:function log-l-dev1
-                             #:upper lambda-h
-                             #:lower lambda-l)
-                     (do ((i 0 (1+ i)))
-                         ;; GEMMA checks for interval too, but let's
-                         ;; leave it for later.
-                         ((= i 100))
-                       (root:iterate! solver))
-                     (if (root:test-interval solver 0 1e-1)
-                         (root:with
-                          (polisher root:+newton-polisher+
-                                    #:function log-l-dev1
-                                    #:derivative log-l-dev2
-                                    #:function+derivative log-l-dev12
-                                    #:approximate-root (root:root solver))
-                          (if (do ((i 0 (1+ i))
-                                   (approximation (root:iterate! polisher)
-                                                  (root:iterate! polisher))
-                                   (previous #f approximation)
-                                   (converged? #f
-                                               (root:test-delta
-                                                approximation previous 0 1e-5)))
-                                  ((= i 100)
-                                   converged?))
-                              (let* ((l (cond
-                                         ((< (root:root polisher)
-                                             (l-min))
-                                          (l-min))
-                                         ((> (root:root polisher)
-                                             (l-max)))
-                                         (else
-                                          (root:root polisher))))
-                                     (logf-l (log-l-f l)))
-                                (cond
-                                 ((and (nan? lam)
-                                       (nan? logf))
-                                  (rec (cdr sign-changes) l logf-l))
-                                 ((< logf logf-l)
-                                  (rec (cdr sign-changes) l logf-l))
-                                 (else
-                                  (rec (cdr sign-changes) lam logf))))
-                              (rec (cdr sign-changes) lam logf)))
-                         (rec (cdr sign-changes) lam logf))))))))))))
+             (cond
+              ((null? sign-changes)
+               (if (nan? lam)
+                   (let ((logf-l (log-l-f (l-min)))
+                         (logf-h (log-l-f (l-max))))
+                     (if (< logf-l logf-h)
+                         (list (l-min) logf-l)
+                         (list (l-max) logf-h)))
+                   (list lam logf)))
+              (else
+               (match (car sign-changes)
+                 ((lambda-l lambda-h)
+                  ;; Allocating a new solver every time. Wasteful?
+                  ;; GEMMA uses root:set! instead.
+                  (let ((handler (gsl:set-error-handler-off!)))
+                    (root:call-with
+                     root:+brent-solver+
+                     (lambda (solver)
+                       (do ((i 0 (1+ i))
+                            (approximation (root:iterate! solver)
+                                           (root:iterate! solver)))
+                           ;; GEMMA checks for interval too, but let's
+                           ;; leave it for later.
+                           ((or (= i 100)
+                                (eq? approximation #f))))
+                       (if (root:test-interval solver 0 1e-1)
+                           (root:with
+                            (polisher root:+newton-polisher+
+                                      #:function log-l-dev1
+                                      #:derivative log-l-dev2
+                                      #:function+derivative log-l-dev12
+                                      #:approximate-root (root:root solver))
+                            (if (do ((i 0 (1+ i))
+                                     (approximation (root:iterate! polisher)
+                                                    (root:iterate! polisher))
+                                     (previous #f approximation)
+                                     (converged? #f
+                                                 (root:test-delta
+                                                  approximation previous 0 1e-5)))
+                                    ((or (= i 100)
+                                         (eq? approximation #f))
+                                     converged?))
+                                (let* ((l (cond
+                                           ((< (root:root polisher)
+                                               (l-min))
+                                            (l-min))
+                                           ((> (root:root polisher)
+                                               (l-max)))
+                                           (else
+                                            (root:root polisher))))
+                                       (logf-l (log-l-f l)))
+                                  (gsl:set-error-handler! handler)
+                                  (cond
+                                   ((and (nan? lam)
+                                         (nan? logf))
+                                    (rec (cdr sign-changes) l logf-l))
+                                   ((< logf logf-l)
+                                    (rec (cdr sign-changes) l logf-l))
+                                   (else
+                                    (rec (cdr sign-changes) lam logf))))
+                                (rec (cdr sign-changes) lam logf)))
+                           (rec (cdr sign-changes) lam logf)))
+                     #:function log-l-dev1
+                     #:upper lambda-h
+                     #:lower lambda-l))))))))))))
 
 (define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
   (let* ((cvt-mtx (or cvt-mtx
@@ -995,19 +1007,19 @@ Return a (MATRIX MARKER-NAMES) list."
                (markers markers (cdr markers)))
               ((= i n-markers))
             (mtx:column->vec! utx i tmp)
-            (calc-uab-4! utw uty tmp uab)
+            (calc-uab-4! utw uty-col tmp uab n-covariates)
             ;; l_mle_null is zero by default?
             (match (rlscore 0 n-covariates n-inds eval uab)
               ((beta tau se p-score p-wald)
                (match (calc-lambda n-inds n-covariates uab eval)
-                 ((lambda logl-h1)
+                 ((lam logl-h1)
                   ;; logl_mle_H0 is zero?
                   (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-h1 0))
                                                 1)))
                     (hash-set! per-snp-params (car markers)
                                (list beta se
                                      1e-5 ;; lambda-remle default
-                                     lambda
+                                     lam
                                      ;; p-wald is calculated in
                                      ;; rlscore, although GEMMA has a
                                      ;; separate function for
