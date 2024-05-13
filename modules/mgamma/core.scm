@@ -182,18 +182,6 @@ The values are `double' arrays with one value per individual."
           (set-car! inds #f))))
     inds))
 
-(define (count-false lst)
-  (do ((lst lst (cdr lst))
-       (false-count
-        (if (car lst)
-            0
-            1)
-        (+ false-count
-           (if (car lst)
-               0
-               1))))
-      ((null? lst) false-count)))
-
 (define* (useful-snps genotypes-mtx markers pheno-mtx covariates-mtx #:key (miss-level 0.05) (maf-level 0.01))
   (let* ((useful-inds (useful-individuals pheno-mtx covariates-mtx))
          (ind-count (length useful-inds))
