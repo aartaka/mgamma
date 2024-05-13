@@ -116,6 +116,39 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
       (rename-file (string-append (dirname output) "/data.mdb")
                    output))))
 
+(define (gwa options)
+  (unless (option-ref options 'help #f)
+    (ensure-options options 'output 'kinship 'geno 'pheno))
+  (let* ((help (option-ref options 'help #f))
+         (output (option-ref options 'output #f)))
+    (cond
+     (help
+      (format #t "Run a linear mixed model on genotype data:
+mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
+     (else
+      (let ((map-size (option-ref options 'map-size #f)))
+        (when map-size
+          (mapsize (suffixed-string->number map-size))))
+      (let* ((geno (option-ref options 'geno #f))
+             (geno-txt? (txt-file? geno))
+             (kin (option-ref options 'kinship #f))
+             (kin-txt? (txt-file? kin)))
+        (match (if geno-txt?
+                   (geno.txt->genotypes-mtx geno)
+                   (lmdb->genotypes-mtx (dirname geno)))
+          ((geno-mtx markers)
+           (let* ((pheno-mtx (pheno.txt->pheno-mtx (option-ref options 'pheno #f)))
+                  (cvt-mtx (if (option-ref options 'covar #f)
+                               (covariates.txt->cvt-mtx (option-ref options 'covar #f))
+                               #f))
+                  (useful-individuals (useful-individuals pheno-mtx cvt-mtx)))
+             (snp-params->assoc.txt
+              (analyze geno-mtx markers (if kin-txt?
+                                            (cxx.txt->kinship kin)
+                                            (lmdb->kinship (dirname kin)))
+                       useful-individuals pheno-mtx cvt-mtx)
+              (option-ref options 'output #f))))))))))
+
 (define (main args)
   (let* ((command (if (> (length args) 1)
                       (second args)
@@ -151,4 +184,4 @@ Same for kinship and gwa.~%"))
         ((kinship)
          (kinship options))
         ((gwa)
-         (format #t "Not implemented yet")))))))
+         (gwa options)))))))
