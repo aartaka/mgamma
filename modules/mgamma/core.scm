@@ -921,9 +921,11 @@ Return a (MATRIX MARKER-NAMES) list."
               (else
                (match (car sign-changes)
                  ((lambda-l lambda-h)
-                  ;; Allocating a new solver every time. Wasteful?
-                  ;; GEMMA uses root:set! instead.
+                  ;; Yes, that's necessary because GSL throws a lot of
+                  ;; errors about infinite, misshaped, etc. functions.
                   (let ((handler (gsl:set-error-handler-off!)))
+                    ;; Allocating a new solver every time. Wasteful?
+                    ;; GEMMA uses root:set! instead. --aartaka
                     (root:call-with
                      root:+brent-solver+
                      (lambda (solver)
