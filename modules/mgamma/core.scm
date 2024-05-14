@@ -17,6 +17,7 @@
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
+  #:use-module (rnrs base)
   #:use-module (json)
   #:export (mapsize
             geno.txt->lmdb
@@ -579,7 +580,7 @@ Return a (MATRIX MARKER-NAMES) list."
          (uab (mtx:alloc n-inds (n-index n-covariates)))
          (ua (vec:alloc n-inds)))
     (do ((a 1 (1+ a)))
-        ((= a (+ n-covariates 3)))
+        ((> a (2+ n-covariates)))
       (unless (= a (1+ n-covariates)) ;; The last column is phenotypes???
         (if (= a (2+ n-covariates))
             (vec:copy! uty ua)
@@ -911,13 +912,7 @@ Return a (MATRIX MARKER-NAMES) list."
                      (logf +nan.0))
              (cond
               ((null? sign-changes)
-               (if (nan? lam)
-                   (let ((logf-l (log-l-f (l-min)))
-                         (logf-h (log-l-f (l-max))))
-                     (if (< logf-l logf-h)
-                         (list (l-min) logf-l)
-                         (list (l-max) logf-h)))
-                   (list lam logf)))
+               (list lam logf))
               (else
                (match (car sign-changes)
                  ((lambda-l lambda-h)
@@ -937,41 +932,42 @@ Return a (MATRIX MARKER-NAMES) list."
                            ((or (= i 100)
                                 (eq? approximation #f))))
                        (if (root:test-interval solver 0 1e-1)
-                           (root:with
-                            (polisher root:+newton-polisher+
-                                      #:function log-l-dev1
-                                      #:derivative log-l-dev2
-                                      #:function+derivative log-l-dev12
-                                      #:approximate-root (root:root solver))
-                            (if (do ((i 0 (1+ i))
-                                     (approximation (root:iterate! polisher)
-                                                    (root:iterate! polisher))
-                                     (previous #f approximation)
-                                     (converged? #f
-                                                 (root:test-delta
-                                                  approximation previous 0 1e-5)))
-                                    ((or (= i 100)
-                                         (eq? approximation #f))
-                                     converged?))
-                                (let* ((l (cond
-                                           ((< (root:root polisher)
-                                               (l-min))
-                                            (l-min))
-                                           ((> (root:root polisher)
-                                               (l-max)))
-                                           (else
-                                            (root:root polisher))))
-                                       (logf-l (log-l-f l)))
-                                  (gsl:set-error-handler! handler)
-                                  (cond
-                                   ((and (nan? lam)
-                                         (nan? logf))
-                                    (rec (cdr sign-changes) l logf-l))
-                                   ((< logf logf-l)
-                                    (rec (cdr sign-changes) l logf-l))
-                                   (else
-                                    (rec (cdr sign-changes) lam logf))))
-                                (rec (cdr sign-changes) lam logf)))
+                           (root:call-with
+                            root:+newton-polisher+
+                            (lambda (polisher)
+                              (if (do ((i 0 (1+ i))
+                                       (approximation (root:iterate! polisher)
+                                                      (root:iterate! polisher))
+                                       (previous #f approximation)
+                                       (converged? #f
+                                                   (root:test-delta
+                                                    approximation previous 0 1e-5)))
+                                      ((or (= i 100)
+                                           (eq? approximation #f))
+                                       converged?))
+                                  (let* ((l (cond
+                                             ((< (root:root polisher)
+                                                 (l-min))
+                                              (l-min))
+                                             ((> (root:root polisher)
+                                                 (l-max)))
+                                             (else
+                                              (root:root polisher))))
+                                         (logf-l (log-l-f l)))
+                                    (gsl:set-error-handler! handler)
+                                    (cond
+                                     ((and (nan? lam)
+                                           (nan? logf))
+                                      (rec (cdr sign-changes) l logf-l))
+                                     ((< logf logf-l)
+                                      (rec (cdr sign-changes) l logf-l))
+                                     (else
+                                      (rec (cdr sign-changes) lam logf))))
+                                  (rec (cdr sign-changes) lam logf)))
+                            #:function log-l-dev1
+                            #:derivative log-l-dev2
+                            #:function+derivative log-l-dev12
+                            #:approximate-root (root:root solver))
                            (rec (cdr sign-changes) lam logf)))
                      #:function log-l-dev1
                      #:upper lambda-h
@@ -997,7 +993,7 @@ Return a (MATRIX MARKER-NAMES) list."
        (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
               (uty (blas:gemm u y #:transpose-a blas:+transpose+))
               (y-col (mtx:column->vec! y 0))
-              (uty-col (mtx:column->vec! utw 0))
+              (uty-col (mtx:column->vec! uty 0))
               (uab (calc-uab-2 utw uty-col))
               (utx (blas:gemm u geno-mtx #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
          (when (= 1 n-phenotypes)
@@ -1049,12 +1045,40 @@ Return a (MATRIX MARKER-NAMES) list."
        params-table))))
 
 
-;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
 ;; (define geno-mtx (first geno))
 ;; (define geno-markers (second geno))
-;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
-;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/BXD_covariates.txt"))
-;; (define kinship (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/BXD.cXX.txt"))
+;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt"))
+;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
+
+;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
 ;; (define params (analyze geno-mtx geno-markers kinship
-;;                         pheno-mtx cvt-mtx))
+;;                         pheno-mtx #f))
+;; (begin (hash-map->list (lambda (key value)
+;;                    (format #t "~a: ~s~%" key value))
+;;                  params)
+;;        #t)
+;; (define uab (analyze geno-mtx geno-markers kinship
+;;                      pheno-mtx #f))
+;; (define uty (analyze geno-mtx geno-markers kinship
+;;                      pheno-mtx #f))
+;; (define uty-col (analyze geno-mtx geno-markers kinship
+;;                          pheno-mtx #f))
+;; (vec:for-each (lambda (i e)
+;;                 (newline)
+;;                 (display e))
+;;               $299)
+;; (let ((prev-row 0))
+;;   (mtx:for-each (lambda (i j e)
+;;                   (when (not (= i prev-row))
+;;                     (newline)
+;;                     (set! prev-row i))
+;;                   (format #t "~s " e))
+;;                 $459))
+;; (define rs3707673 (hash-ref params "rs3707673"))
+;; (hash-ref params "rs6336442")
+;; (hash-map->list (lambda (key value)
+;;                   (format #t "~a: ~s~%"
+;;                           key value))
+;;                 params)
