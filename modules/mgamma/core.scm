@@ -990,6 +990,7 @@ Return a (MATRIX MARKER-NAMES) list."
          (n-index (n-index n-covariates))
          (useful-individuals (useful-individuals pheno-mtx cvt-mtx))
          (per-snp-params (make-hash-table n-markers)))
+    (cleanup-mtx geno-mtx)
     (calc-covariate-pheno w y pheno-mtx cvt-mtx useful-individuals)
     (center-matrix! kinship-mtx)
     (match (eigendecomposition-zeroed kinship-mtx)
