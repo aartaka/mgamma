@@ -655,7 +655,11 @@ Return a (MATRIX MARKER-NAMES) list."
              (df (- n-inds n-covariates 1))
              (beta (/ p-xy p-xx))
              (tau (/ df px-yy))
-             (se (sqrt (/ 1 (* tau p-xx))))
+             ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
+             (d (/ 1 (* tau p-xx)))
+             (se (if (negative? d)
+                     +nan.0
+                     (sqrt d)))
              (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy)) 1.0 df))
              (p-score (gsl-cdf-fdist-q
                        (/ (* n-inds p-xy p-xy)
