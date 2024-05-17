@@ -309,7 +309,7 @@ Return a (MATRIX MARKER-NAMES) list."
 
 (define (kinship-mtx geno-mtx markers useful-snps)
   "Calculatep the kinship matrix for genotype MTX."
-  (let* ((n-useful-snps (hash-count (cut or #t <> <>) useful-snps))
+  (let* ((n-useful-snps (hash-count (lambda (k v) #t) useful-snps))
          ;; Because we need to sort the useful SNPs into their own matrix.
          (intermediate-mtx (mtx:alloc n-useful-snps (mtx:columns geno-mtx)))
          (tmp-vec (vec:alloc (mtx:columns geno-mtx) 0)))
