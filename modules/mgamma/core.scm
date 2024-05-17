@@ -1036,7 +1036,7 @@ Return a (MATRIX MARKER-NAMES) list."
 (define (snp-params->assoc.txt params-table assoc.txt)
   (call-with-port (open-output-file assoc.txt)
     (lambda (p)
-      (format p "rs~tbeta~tse~tlogl_H1~tl_remle~tp_wald")
+      (format p "rs~t beta~t se~t logl_H1~t l_remle~t p_wald~%")
       (hash-map->list
        (lambda (key value)
          (match value
@@ -1045,7 +1045,7 @@ Return a (MATRIX MARKER-NAMES) list."
                   lambda
                   p-wald
                   p-ltr p-score logl-h1)
-            (format p "~a~t ~s~t ~s~t ~s~t ~s~t ~s"
+            (format p "~a~t ~s~t ~s~t ~s~t ~s~t ~s~%"
                     key     beta se   logl-h1 lambda-remle p-wald))))
        params-table))))
 
