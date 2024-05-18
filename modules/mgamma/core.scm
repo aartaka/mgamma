@@ -634,8 +634,7 @@ Return a (MATRIX MARKER-NAMES) list."
    (mtx:with
     (ppab (+ n-covariates 2) (n-index n-covariates) 0)
     (vec:with
-     (v-temp (vec:length eigenvalues) 0)
-     (vec:copy! eigenvalues v-temp)
+     (v-temp (vec:length eigenvalues) eigenvalues)
      (vec:scale! v-temp l)
      (vec:with
       (hi-eval (vec:length eigenvalues) 1)
