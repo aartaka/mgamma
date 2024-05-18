@@ -146,7 +146,7 @@ mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|t
               (analyze geno-mtx markers (if kin-txt?
                                             (cxx.txt->kinship kin)
                                             (lmdb->kinship (dirname kin)))
-                       useful-individuals pheno-mtx cvt-mtx)
+                       pheno-mtx cvt-mtx)
               (option-ref options 'output #f))))))))))
 
 (define (main args)
