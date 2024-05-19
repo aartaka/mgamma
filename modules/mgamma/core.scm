@@ -40,6 +40,8 @@
 (define n-regions (make-parameter 10))
 (define l-min (make-parameter 1e-5))
 (define l-max (make-parameter 1e+5))
+(define l-mle-null (make-parameter 0))
+(define log-mle-h0 (make-parameter 0))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
 ;; TODO: Apply PEG to a whole file?
@@ -1015,6 +1017,15 @@ Return a (MATRIX MARKER-NAMES) list."
                     (mtx:get geno-mtx row geno-i)))))
     new-mtx))
 
+(define (calc-lambda-null utw uty-col eval)
+  (let* ((n-covariates (mtx:columns utw))
+         (n-inds (mtx:rows utw))
+         (n-index (n-index n-covariates))
+         (uab (calc-uab-null utw uty-col))
+         (results (calc-lambda n-inds n-covariates uab eval)))
+    (mtx:free uab)
+    results))
+
 (define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
   (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
          (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
@@ -1045,6 +1056,10 @@ Return a (MATRIX MARKER-NAMES) list."
               (uab (calc-uab-null utw uty-col))
               (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
          (when (= 1 n-phenotypes)
+           (match (calc-lambda-null utw uty-col eval)
+             ((lam logl-h1)
+              (l-mle-null lam)
+              (log-mle-h0 logl-h1)))
            ;; TODO
            #f)
          (vec:with
@@ -1054,8 +1069,7 @@ Return a (MATRIX MARKER-NAMES) list."
               ((= i n-markers))
             (mtx:column->vec! utx i tmp)
             (calc-uab-alt! utw uty-col tmp uab n-covariates)
-            ;; l_mle_null is zero by default?
-            (match (rlscore 0 n-covariates n-useful-inds eval uab)
+            (match (rlscore (l-mle-null) n-covariates n-useful-inds eval uab)
               ((beta tau se p-score p-wald)
                (match (calc-lambda n-useful-inds n-covariates uab eval)
                  ((lam logl-h1)
