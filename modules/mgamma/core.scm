@@ -570,9 +570,10 @@ Return a (MATRIX MARKER-NAMES) list."
   #f)
 
 (define (n-index n-covariates)
-  (* (+ n-covariates 3)
-     (+ n-covariates 2)
-     1/2))
+  (floor
+   (* (+ n-covariates 3)
+      (+ n-covariates 2)
+      1/2)))
 
 (define (calc-uab-null utw uty)
   (let* ((n-inds (mtx:rows utw))
