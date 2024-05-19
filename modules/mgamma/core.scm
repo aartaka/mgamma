@@ -574,7 +574,7 @@ Return a (MATRIX MARKER-NAMES) list."
      (+ n-covariates 2)
      1/2))
 
-(define (calc-uab-2 utw uty)
+(define (calc-uab-null utw uty)
   (let* ((n-inds (mtx:rows utw))
          (n-covariates (mtx:columns utw))
          (uab (mtx:alloc n-inds (n-index n-covariates)))
@@ -1040,7 +1040,7 @@ Return a (MATRIX MARKER-NAMES) list."
               (uty (blas:gemm u y #:transpose-a blas:+transpose+))
               (y-col (mtx:column->vec! y 0))
               (uty-col (mtx:column->vec! uty 0))
-              (uab (calc-uab-2 utw uty-col))
+              (uab (calc-uab-null utw uty-col))
               (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
          (when (= 1 n-phenotypes)
            ;; TODO
