@@ -578,13 +578,13 @@ Return a (MATRIX MARKER-NAMES) list."
   (let* ((n-inds (mtx:rows utw))
          (n-covariates (mtx:columns utw))
          (uab (mtx:alloc n-inds (n-index n-covariates)))
-         (ua (vec:alloc n-inds)))
+         (tmp (vec:alloc n-inds)))
     (do ((a 1 (1+ a)))
         ((> a (2+ n-covariates)))
       (unless (= a (1+ n-covariates)) ;; The last column is phenotypes???
         (if (= a (2+ n-covariates))
-            (vec:copy! uty ua)
-            (mtx:column->vec! utw (1- a) ua))
+            (vec:copy! uty tmp)
+            (mtx:column->vec! utw (1- a) tmp))
         (do ((b a (1- b)))
             ((zero? b))
           (unless (= b (1+ n-covariates)) ;; Same as above
@@ -595,9 +595,9 @@ Return a (MATRIX MARKER-NAMES) list."
                   (let ((column (mtx:column->vec! utw (1- b))))
                     (vec:copy! column uab-col)
                     (vec:free column)))
-              (vec:multiply! uab-col ua)
+              (vec:multiply! uab-col tmp)
               (mtx:vec->column! uab-col uab index-ab))))))
-    (vec:free ua)
+    (vec:free tmp)
     uab))
 
 ;; uab is reused from the result of calc-uab-2
