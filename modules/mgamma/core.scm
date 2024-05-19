@@ -600,8 +600,9 @@ Return a (MATRIX MARKER-NAMES) list."
     (vec:free tmp)
     uab))
 
-;; uab is reused from the result of calc-uab-2
-(define (calc-uab-4! utw uty-col utx-col uab n-covariates)
+;; uab is reused/modified from the result of calc-uab-null
+(define (calc-uab-alt! utw uty-col utx-col uab n-covariates)
+  "Calculate Uab for alternative model?"
   (let* ((n-inds (mtx:rows utw))
          (tmp (vec:alloc (mtx:rows uab))))
     (do ((b 1 (1+ b)))
@@ -1051,7 +1052,7 @@ Return a (MATRIX MARKER-NAMES) list."
                (markers markers (cdr markers)))
               ((= i n-markers))
             (mtx:column->vec! utx i tmp)
-            (calc-uab-4! utw uty-col tmp uab n-covariates)
+            (calc-uab-alt! utw uty-col tmp uab n-covariates)
             ;; l_mle_null is zero by default?
             (match (rlscore 0 n-covariates n-useful-inds eval uab)
               ((beta tau se p-score p-wald)
