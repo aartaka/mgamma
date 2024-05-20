@@ -624,6 +624,7 @@ Return a (MATRIX MARKER-NAMES) list."
     uab))
 
 (define (eigendecomposition-zeroed kinship)
+  "Eigendecomposition, but zero the values below threshold."
   (match (eigen:solve! kinship)
     ((evalues-vec evectors-mtx)
      (do ((i 0 (1+ i)))
@@ -633,6 +634,7 @@ Return a (MATRIX MARKER-NAMES) list."
      (list evalues-vec evectors-mtx))))
 
 (define (rlscore l n-covariates n-inds eigenvalues uab)
+  "Calculate (BETA TAU SE P-SCORE P-WALD) for UAB etc."
   (mtx:with
    (pab (+ n-covariates 2) (n-index n-covariates) 0)
    (mtx:with
@@ -672,6 +674,8 @@ Return a (MATRIX MARKER-NAMES) list."
         (list beta tau se p-score p-wald)))))))
 
 (define (calc-covariate-pheno w y pheno-mtx cvt-mtx useful-individuals)
+  "Put PHENO-MTX data into Y and CVT-MTX into W.
+Only include the data for USEFUL-INDIVIDUALS."
   (do ((n-covariates (if cvt-mtx
                          (mtx:columns cvt-mtx)
                          1))
@@ -691,12 +695,14 @@ Return a (MATRIX MARKER-NAMES) list."
         (mtx:set! w ci-test cvt (mtx:get cvt-mtx i cvt))))))
 
 (define (center-matrix! mtx)
+  "Weird one directly copied from GEMMA's CenterMatrix."
   (let* ((size (mtx:rows mtx))
          (w (vec:alloc size 1.0))
          (gw (blas:gemv mtx w)))
     (blas:syr2! gw w mtx #:alpha (/ -1 size))
     (let ((d (blas:dot w gw)))
       (blas:syr! w mtx #:alpha (/ d (expt size 2))))
+    ;; GEMMA says it's transpose, but I don't believe it -- aartaka.
     (do ((i 0 (1+ i)))
         ((= i size))
       (do ((j 0 (1+ j)))
@@ -712,6 +718,9 @@ Return a (MATRIX MARKER-NAMES) list."
 ;; This function exists for the sole reason of closing over UAB et
 ;; al. while passing the generated functions to GSL root solvers.
 (define (make-log-functions n-inds n-covariates uab eval)
+  "Used to create functions closed over UAB, EVAL etc.
+GEMMA uses FUNC_PARAMS struct and GSL root setters for that, but we
+have closures for that in Scheme."
   (list
    ;; LogL_dev1
    (lambda (l)
@@ -893,6 +902,8 @@ Return a (MATRIX MARKER-NAMES) list."
             result))))))))
 
 (define (calc-lambda n-inds n-covariates uab eval)
+  "Calculate lambda for alternative model (UAB from `calc-uab-alt!')
+Return a list of (LAMBDA LOGF)."
   (match (make-log-functions n-inds n-covariates uab eval)
     ((log-l-dev1 log-l-dev2 log-l-dev12 log-l-f)
      (let* ((lambda-interval (/ (log (/ (l-max) (l-min))) (n-regions)))
@@ -981,6 +992,9 @@ Return a (MATRIX MARKER-NAMES) list."
                      #:lower lambda-l))))))))))))
 
 (define (useful-kinship-mtx kinship-mtx useful-inds)
+  "Only retain these individuals in the KINSHIP-MTX that are USEFUL-INDS.
+Create and return a new matrix of size equal to useful individuals
+number."
   (let* ((n-useful (count identity useful-inds))
          (new-mtx (mtx:alloc n-useful n-useful)))
     (do ((outer-useful-inds useful-inds (cdr outer-useful-inds))
@@ -1002,6 +1016,8 @@ Return a (MATRIX MARKER-NAMES) list."
     new-mtx))
 
 (define (useful-geno-mtx geno-mtx useful-inds)
+  "Remove non-USEFUL-INDS from GENO-MTX.
+Create and return a new matrix."
   (let* ((n-useful (count identity useful-inds))
          (new-mtx (mtx:alloc (mtx:rows geno-mtx) n-useful)))
     (do ((row 0 (1+ row)))
@@ -1018,6 +1034,7 @@ Return a (MATRIX MARKER-NAMES) list."
     new-mtx))
 
 (define (calc-lambda-null utw uty-col eval)
+  "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates))
@@ -1027,6 +1044,9 @@ Return a (MATRIX MARKER-NAMES) list."
     results))
 
 (define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
+  "Return the per-snp params for MARKERS in GENO-MTX.
+Use KINSHIP-MTX, PHENO-MTX, and CVT-MTX for computations, but mostly
+clean them up into new ones and use those."
   (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
          (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
          (useful-geno (useful-geno-mtx geno-mtx useful-individuals))
@@ -1091,6 +1111,7 @@ Return a (MATRIX MARKER-NAMES) list."
     per-snp-params))
 
 (define (snp-params->assoc.txt params-table assoc.txt)
+  "Dump PARAMS-TABLE to the ASSOC.TXT file."
   (call-with-port (open-output-file assoc.txt)
     (lambda (p)
       (format p "rs\t beta\t se\t logl_H1\t l_remle\t p_wald~%")
