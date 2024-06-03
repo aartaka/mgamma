@@ -1051,6 +1051,22 @@ Create and return a new matrix."
                     (mtx:get geno-mtx row geno-i)))))
     new-mtx))
 
+(define (useful-pheno-mtx pheno-mtx useful-inds)
+  (let* ((n-useful (count identity useful-inds))
+         (new-mtx (mtx:alloc n-useful (mtx:columns pheno-mtx))))
+    (do ((useful-inds useful-inds (cdr useful-inds))
+         (pheno-i 0 (1+ pheno-i))
+         (i 0 (if (car useful-inds)
+                  (1+ i)
+                  i)))
+        ((null? useful-inds))
+      (when (car useful-inds)
+        (do ((col 0 (1+ col)))
+            ((= col (mtx:columns pheno-mtx)))
+          (mtx:set! new-mtx i col
+                    (mtx:get pheno-mtx pheno-i col)))))
+    new-mtx))
+
 (define (calc-lambda-null utw uty-col eval)
   "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
@@ -1068,6 +1084,7 @@ clean them up into new ones and use those."
   (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
          (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
          (useful-geno (useful-geno-mtx geno-mtx useful-individuals))
+         (useful-pheno (useful-pheno-mtx pheno-mtx useful-individuals))
          (cvt-mtx (or cvt-mtx
                       ;; This is not useful-kinship so that
                       ;; calc-covariate-pheno gets the right size of
