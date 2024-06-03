@@ -37,6 +37,22 @@
             analyze
             snp-params->assoc.txt))
 
+(gsl:set-error-handler
+ (lambda* (#:optional (reason "unknown reason") (file "unknown-file") (line -1) (errno -1) #:rest rest)
+   (let ((error-text
+          (format #f "Error ~d (~a at ~a:~d): ~a"
+                  errno (gsl:strerror errno)
+                  (if (pointer? file)
+                      (pointer->string file)
+                      file)
+                  line
+                  (if (pointer? reason)
+                      (pointer->string reason)
+                      reason))))
+     (display error-text)
+     (newline)
+     (error 'gsl error-text))))
+
 (define mapsize (make-parameter (* 100 10485760)))
 (define n-regions (make-parameter 10))
 (define l-min (make-parameter 1e-5))
