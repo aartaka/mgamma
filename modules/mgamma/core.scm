@@ -883,7 +883,7 @@ have closures for that in Scheme."
                                    (- (* 2 ypkpkpy p-yy)
                                       (* ypkpy ypkpy))
                                    (/ 1 (* p-yy p-yy))))))
-                  (list dev1 dev2))))))))))))
+                  (values dev1 dev2))))))))))))
    ;; LogL_f
    (lambda (l)
      (let ((nc-total (1+ n-covariates))
@@ -969,42 +969,28 @@ Return a list of (LAMBDA LOGF)."
                            ((or (= i 100)
                                 (eq? approximation #f))))
                        (if (root:test-interval solver 0 1e-1)
-                           (root:call-with
-                            root:+newton-polisher+
-                            (lambda (polisher)
-                              (if (do ((i 0 (1+ i))
-                                       (approximation (root:iterate! polisher)
-                                                      (root:iterate! polisher))
-                                       (previous #f approximation)
-                                       (converged? #f
-                                                   (root:test-delta
-                                                    approximation previous 0 1e-5)))
-                                      ((or (= i 100)
-                                           (eq? approximation #f))
-                                       converged?))
-                                  (let* ((l (cond
-                                             ((< (root:root polisher)
-                                                 (l-min))
-                                              (l-min))
-                                             ((> (root:root polisher)
-                                                 (l-max)))
-                                             (else
-                                              (root:root polisher))))
-                                         (logf-l (log-l-f l)))
-                                    (gsl:set-error-handler! handler)
-                                    (cond
-                                     ((and (nan? lam)
-                                           (nan? logf))
-                                      (rec (cdr sign-changes) l logf-l))
-                                     ((< logf logf-l)
-                                      (rec (cdr sign-changes) l logf-l))
-                                     (else
-                                      (rec (cdr sign-changes) lam logf))))
-                                  (rec (cdr sign-changes) lam logf)))
-                            #:function log-l-dev1
-                            #:derivative log-l-dev2
-                            #:function+derivative log-l-dev12
-                            #:approximate-root (root:root solver))
+                           (let ((handler (gsl:set-error-handler-off!))
+                                 (root (root:optimize
+                                        root:+newton-polisher+ 100 1e-5
+                                        #:function log-l-dev1
+                                        #:derivative log-l-dev2
+                                        #:function+derivative log-l-dev12
+                                        #:approximate-root (root:root solver)))
+                                 (_ (gsl:set-error-handler! handler)))
+                             (if root
+                                 (let* ((l (min (max root
+                                                     (l-min))
+                                                (l-max)))
+                                        (logf-l (log-l-f l)))
+                                   (cond
+                                    ((and (nan? lam)
+                                          (nan? logf))
+                                     (rec (cdr sign-changes) l logf-l))
+                                    ((< logf logf-l)
+                                     (rec (cdr sign-changes) l logf-l))
+                                    (else
+                                     (rec (cdr sign-changes) lam logf))))
+                                 (rec (cdr sign-changes) lam logf)))
                            (rec (cdr sign-changes) lam logf)))
                      #:function log-l-dev1
                      #:upper lambda-h
