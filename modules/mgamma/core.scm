@@ -684,7 +684,7 @@ Return a (MATRIX MARKER-NAMES) list."
              (se (if (negative? d)
                      +nan.0
                      (sqrt d)))
-             (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy)) 1.0 df))
+             (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
              (p-score (gsl-cdf-fdist-q
                        (/ (* n-inds p-xy p-xy)
                           (* p-yy p-xx))
