@@ -681,9 +681,7 @@ Return a (MATRIX MARKER-NAMES) list."
              (tau (/ df px-yy))
              ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
              (d (/ 1 (* tau p-xx)))
-             (se (if (negative? d)
-                     +nan.0
-                     (sqrt d)))
+             (se (sqrt (abs d)))
              (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
              (p-score (gsl-cdf-fdist-q
                        (/ (* n-inds p-xy p-xy)
@@ -969,14 +967,16 @@ Return a list of (LAMBDA LOGF)."
                            ((or (= i 100)
                                 (eq? approximation #f))))
                        (if (root:test-interval solver 0 1e-1)
-                           (let ((handler (gsl:set-error-handler-off!))
-                                 (root (root:optimize
-                                        root:+newton-polisher+ 100 1e-5
-                                        #:function log-l-dev1
-                                        #:derivative log-l-dev2
-                                        #:function+derivative log-l-dev12
-                                        #:approximate-root (root:root solver)))
-                                 (_ (gsl:set-error-handler! handler)))
+                           (let* ((handler (gsl:set-error-handler-off!))
+                                  (old-root (root:root solver))
+                                  (root (or (root:optimize
+                                             root:+newton-polisher+ 100 1e-5
+                                             #:function log-l-dev1
+                                             #:derivative log-l-dev2
+                                             #:function+derivative log-l-dev12
+                                             #:approximate-root old-root)
+                                            old-root))
+                                  (_ (gsl:set-error-handler! handler)))
                              (if root
                                  (let* ((l (min (max root
                                                      (l-min))
