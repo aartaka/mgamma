@@ -216,10 +216,9 @@ The values are `double' arrays with one value per individual."
              (ind 0) ;; To allow using it in do for maf
              (maf (do ((ind ind (1+ ind))
                        (useful-inds useful-inds (cdr useful-inds))
-                       (maf 0
-                            (if (car useful-inds)
-                                (+ maf (mtx:get genotypes-mtx row ind))
-                                maf)))
+                       (maf 0 (if (car useful-inds)
+                                  (+ maf (mtx:get genotypes-mtx row ind))
+                                  maf)))
                       ((= ind mtx-cols) maf)))
              (miss-count (do ((ind 0 (1+ ind))
                               (useful-inds useful-inds (cdr useful-inds))
