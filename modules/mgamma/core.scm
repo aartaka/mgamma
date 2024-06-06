@@ -231,7 +231,7 @@ The values are `double' arrays with one value per individual."
              (maf (/ maf (* 2 (- ind-count miss-count)))))
         (when (and (< (/ miss-count ind-count) miss-level)
                    (< maf-level maf (- 1 maf-level)))
-          (hash-set! useful-snp-table name #t))))
+          (hash-set! useful-snp-table name maf))))
     useful-snp-table))
 
 
@@ -1069,6 +1069,7 @@ Create and return a new matrix."
 Use KINSHIP-MTX, PHENO-MTX, and CVT-MTX for computations, but mostly
 clean them up into new ones and use those."
   (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
+         (useful-snps (useful-snps geno-mtx markers pheno-mtx cvt-mtx))
          (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
          (useful-geno (useful-geno-mtx geno-mtx useful-individuals))
          (useful-pheno (useful-pheno-mtx pheno-mtx useful-individuals))
@@ -1119,17 +1120,20 @@ clean them up into new ones and use those."
                  (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-h1 0))
                                                1)))
                    (hash-set! per-snp-params (car markers)
-                              (list beta se
-                                    1e-5 ;; lambda-remle default
-                                    lam
-                                    ;; p-wald is calculated in
-                                    ;; rlscore, although GEMMA has a
-                                    ;; separate function for
-                                    ;; it. Otherwise I was unable to
-                                    ;; find where it comes from --
-                                    ;; aartaka
-                                    p-wald
-                                    p-ltr p-score logl-h1)))))))))))
+                              (list
+                               ;; Maf
+                               (hash-ref useful-snps (car markers))
+                               beta se
+                               1e-5 ;; lambda-remle default
+                               lam
+                               ;; p-wald is calculated in
+                               ;; rlscore, although GEMMA has a
+                               ;; separate function for
+                               ;; it. Otherwise I was unable to
+                               ;; find where it comes from --
+                               ;; aartaka
+                               p-wald
+                               p-ltr p-score logl-h1)))))))))))
     per-snp-params))
 
 (define (snp-params->assoc.txt params-table assoc.txt)
