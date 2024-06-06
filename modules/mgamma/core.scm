@@ -1165,8 +1165,8 @@ clean them up into new ones and use those."
 ;; (define params (analyze geno-mtx geno-markers kinship
 ;;                         pheno-mtx #f))
 ;; (begin (hash-map->list (lambda (key value)
-;;                    (format #t "~a: ~s~%" key value))
-;;                  params)
+;;                          (format #t "~a: ~s~%" key value))
+;;                        params)
 ;;        #t)
 ;; (define uab (analyze geno-mtx geno-markers kinship
 ;;                      pheno-mtx #f))
