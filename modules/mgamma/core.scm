@@ -687,7 +687,7 @@ Return a (MATRIX MARKER-NAMES) list."
                           (* p-yy p-xx))
                        1.0
                        df)))
-        (list beta tau se p-score p-wald)))))))
+        (values beta tau se p-score p-wald)))))))
 
 (define (calc-covariate-pheno w y pheno-mtx cvt-mtx useful-individuals)
   "Put PHENO-MTX data into Y and CVT-MTX into W.
@@ -939,14 +939,14 @@ Return a list of (LAMBDA LOGF)."
            (let ((logf-l (log-l-f (l-min)))
                  (logf-h (log-l-f (l-max))))
              (if (>= logf-l logf-h)
-                 (list (l-min) logf-l)
-                 (list (l-max) logf-h)))
+                 (values (l-min) logf-l)
+                 (values (l-max) logf-h)))
            (let rec ((sign-changes sign-changes)
                      (lam +nan.0)
                      (logf +nan.0))
              (cond
               ((null? sign-changes)
-               (list lam logf))
+               (values lam logf))
               (else
                (match (car sign-changes)
                  ((lambda-l lambda-h)
@@ -1058,10 +1058,14 @@ Create and return a new matrix."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates))
-         (uab (calc-uab-null utw uty-col))
-         (results (calc-lambda n-inds n-covariates uab eval)))
-    (mtx:free uab)
-    results))
+         (uab (calc-uab-null utw uty-col)))
+    (dynamic-wind
+      (lambda ()
+        #t)
+      (lambda ()
+        (calc-lambda n-inds n-covariates uab eval))
+      (lambda ()
+        (mtx:free uab)))))
 
 (define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
   "Return the per-snp params for MARKERS in GENO-MTX.
@@ -1098,10 +1102,10 @@ clean them up into new ones and use those."
              (uab (calc-uab-null utw uty-col))
              (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
         (when (= 1 n-phenotypes)
-          (match (calc-lambda-null utw uty-col eval)
-            ((lam logl-h0)
-             (l-mle-null lam)
-             (log-mle-null logl-h0)))
+          (receive (lam logl-h0)
+              (calc-lambda-null utw uty-col eval)
+            (l-mle-null lam)
+            (log-mle-null logl-h0))
           ;; TODO
           #f)
         (vec:with
@@ -1111,27 +1115,27 @@ clean them up into new ones and use those."
              ((= i n-markers))
            (mtx:column->vec! utx i tmp)
            (calc-uab-alt! utw uty-col tmp uab n-covariates)
-           (match (rlscore (l-mle-null) n-covariates n-useful-inds eval uab)
-             ((beta tau se p-score p-wald)
-              (match (calc-lambda n-useful-inds n-covariates uab eval)
-                ((lam logl-alt)
-                 (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null)))
-                                               1)))
-                   (hash-set! per-snp-params (car markers)
-                              (list
-                               ;; Maf
-                               (hash-ref useful-snps (car markers))
-                               beta se
-                               1e-5 ;; lambda-remle default
-                               lam
-                               ;; p-wald is calculated in
-                               ;; rlscore, although GEMMA has a
-                               ;; separate function for
-                               ;; it. Otherwise I was unable to
-                               ;; find where it comes from --
-                               ;; aartaka
-                               p-wald
-                               p-ltr p-score logl-alt)))))))))))
+           (receive (beta tau se p-score p-wald)
+               (rlscore (l-mle-null) n-covariates n-useful-inds eval uab)
+             (receive (lam logl-alt)
+                 (calc-lambda n-useful-inds n-covariates uab eval)
+               (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null)))
+                                             1)))
+                 (hash-set! per-snp-params (car markers)
+                            (list
+                             ;; Maf
+                             (hash-ref useful-snps (car markers))
+                             beta se
+                             1e-5 ;; lambda-remle default
+                             lam
+                             ;; p-wald is calculated in
+                             ;; rlscore, although GEMMA has a
+                             ;; separate function for
+                             ;; it. Otherwise I was unable to
+                             ;; find where it comes from --
+                             ;; aartaka
+                             p-wald
+                             p-ltr p-score logl-alt)))))))))
     per-snp-params))
 
 (define (snp-params->assoc.txt params-table assoc.txt)
