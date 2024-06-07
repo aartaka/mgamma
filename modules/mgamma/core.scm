@@ -1036,6 +1036,21 @@ Create and return a new matrix."
                     (mtx:get geno-mtx row geno-i)))))
     new-mtx))
 
+(define (useful-geno-mtx-per-snps geno-mtx markers useful-snps)
+  (let* ((tmp (vec:alloc (mtx:columns geno-mtx) 0))
+         (new-rows (hash-count (lambda (k v) v) useful-snps))
+         (new-mtx (mtx:alloc new-rows (mtx:columns geno-mtx) 0))
+         (i 0))
+    (do ((markers markers (cdr markers))
+         (row 0 (1+ row)))
+        ((= i new-rows))
+      (when (hash-ref useful-snps (car markers) #f)
+        (mtx:row->vec! geno-mtx row tmp)
+        (mtx:vec->row! tmp new-mtx i)
+        (set! i (1+ i))))
+    (vec:free tmp)
+    new-mtx))
+
 (define (useful-pheno-mtx pheno-mtx useful-inds)
   (let* ((n-useful (count identity useful-inds))
          (new-mtx (mtx:alloc n-useful (mtx:columns pheno-mtx))))
@@ -1080,6 +1095,7 @@ clean them up into new ones and use those."
                       ;; calc-covariate-pheno gets the right size of
                       ;; vct-mtx.
                       (mtx:alloc (mtx:rows kinship-mtx) 1 1)))
+         (useful-geno (useful-geno-mtx-per-snps useful-geno markers useful-snps))
          (n-covariates (mtx:columns cvt-mtx))
          (n-phenotypes (mtx:columns pheno-mtx))
          (n-useful-inds (mtx:rows useful-kinship))
