@@ -1155,17 +1155,18 @@ clean them up into new ones and use those."
   "Dump PARAMS-TABLE to the ASSOC.TXT file."
   (call-with-port (open-output-file assoc.txt)
     (lambda (p)
-      (format p "rs\t beta\t se\t logl_H1\t l_remle\t p_wald~%")
+      (format p "rs\t maf\t beta\t se\t logl_H1\t l_remle\t p_wald~%")
       (hash-map->list
        (lambda (key value)
          (match value
-           ((beta se
-                  lambda-remle
-                  lambda
-                  p-wald
-                  p-ltr p-score logl-alt)
-            (format p "~a\t ~s\t ~s\t ~s\t ~s\t ~s~%"
-                    key     beta se   logl-alt lambda-remle p-wald))))
+           ((maf
+             beta se
+             lambda-remle
+             lambda
+             p-wald
+             p-ltr p-score logl-alt)
+            (format p "~a\t ~s\t ~s\t ~s\t ~s\t ~s\t ~s~%"
+                    key     maf  beta se   logl-alt lambda-remle p-wald))))
        params-table))))
 
 
