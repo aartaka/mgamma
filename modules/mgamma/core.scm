@@ -688,9 +688,10 @@ Return a (MATRIX MARKER-NAMES) list."
                        df)))
         (values beta tau se p-score p-wald)))))))
 
-(define (calc-covariate-pheno w y pheno-mtx cvt-mtx useful-individuals)
-  "Put PHENO-MTX data into Y and CVT-MTX into W.
+(define (calc-covariate-pheno y w useful-pheno-mtx cvt-mtx useful-individuals)
+  "Put USEFUL-PHENO-MTX data into Y and CVT-MTX into W.
 Only include the data for USEFUL-INDIVIDUALS."
+  (mtx:copy! useful-pheno-mtx y)
   (do ((n-covariates (if cvt-mtx
                          (mtx:columns cvt-mtx)
                          1))
@@ -702,9 +703,6 @@ Only include the data for USEFUL-INDIVIDUALS."
        (inds useful-individuals (cdr inds)))
       ((null? inds))
     (when (car inds)
-      (do ((ph 0 (1+ ph)))
-          ((= ph n-phenotypes))
-        (mtx:set! y ci-test ph (mtx:get pheno-mtx i ph)))
       (do ((cvt 0 (1+ cvt)))
           ((= cvt n-covariates))
         (mtx:set! w ci-test cvt (mtx:get cvt-mtx i cvt))))))
@@ -1106,7 +1104,7 @@ clean them up into new ones and use those."
          (n-index (n-index n-covariates))
          (per-snp-params (make-hash-table n-markers)))
     (cleanup-mtx useful-geno)
-    (calc-covariate-pheno w y pheno-mtx cvt-mtx useful-individuals)
+    (calc-covariate-pheno y w useful-pheno cvt-mtx useful-individuals)
     (center-matrix! useful-kinship)
     (receive (eval u)
         (eigendecomposition-zeroed useful-kinship)
