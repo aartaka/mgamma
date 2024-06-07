@@ -59,7 +59,7 @@
 (define l-min (make-parameter 1e-5))
 (define l-max (make-parameter 1e+5))
 (define l-mle-null (make-parameter 0))
-(define log-mle-h0 (make-parameter 0))
+(define log-mle-null (make-parameter 0))
 
 ;; TODO: Make a state machine parser instead? Something like guile-csv
 ;; TODO: Apply PEG to a whole file?
@@ -1099,9 +1099,9 @@ clean them up into new ones and use those."
              (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
         (when (= 1 n-phenotypes)
           (match (calc-lambda-null utw uty-col eval)
-            ((lam logl-h1)
+            ((lam logl-h0)
              (l-mle-null lam)
-             (log-mle-h0 logl-h1)))
+             (log-mle-null logl-h0)))
           ;; TODO
           #f)
         (vec:with
@@ -1114,9 +1114,9 @@ clean them up into new ones and use those."
            (match (rlscore (l-mle-null) n-covariates n-useful-inds eval uab)
              ((beta tau se p-score p-wald)
               (match (calc-lambda n-useful-inds n-covariates uab eval)
-                ((lam logl-h1)
-                 ;; logl_mle_H0 is zero?
-                 (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-h1 0))
+                ((lam logl-alt)
+                 ;; logl_mle_H0 (log likelihood with maximum likelihood ) is zero?
+                 (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null)))
                                                1)))
                    (hash-set! per-snp-params (car markers)
                               (list
@@ -1132,7 +1132,7 @@ clean them up into new ones and use those."
                                ;; find where it comes from --
                                ;; aartaka
                                p-wald
-                               p-ltr p-score logl-h1)))))))))))
+                               p-ltr p-score logl-alt)))))))))))
     per-snp-params))
 
 (define (snp-params->assoc.txt params-table assoc.txt)
@@ -1147,9 +1147,9 @@ clean them up into new ones and use those."
                   lambda-remle
                   lambda
                   p-wald
-                  p-ltr p-score logl-h1)
+                  p-ltr p-score logl-alt)
             (format p "~a\t ~s\t ~s\t ~s\t ~s\t ~s~%"
-                    key     beta se   logl-h1 lambda-remle p-wald))))
+                    key     beta se   logl-alt lambda-remle p-wald))))
        params-table))))
 
 
