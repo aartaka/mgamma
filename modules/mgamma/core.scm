@@ -213,8 +213,7 @@ The values are `double' arrays with one value per individual."
          (markers markers (cdr markers)))
         ((= row mtx-rows))
       (let* ((name (car markers))
-             (ind 0) ;; To allow using it in do for maf
-             (maf (do ((ind ind (1+ ind))
+             (maf (do ((ind 0 (1+ ind))
                        (useful-inds useful-inds (cdr useful-inds))
                        (maf 0 (if (car useful-inds)
                                   (+ maf (mtx:get genotypes-mtx row ind))
