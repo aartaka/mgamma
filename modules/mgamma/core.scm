@@ -1115,7 +1115,6 @@ clean them up into new ones and use those."
              ((beta tau se p-score p-wald)
               (match (calc-lambda n-useful-inds n-covariates uab eval)
                 ((lam logl-alt)
-                 ;; logl_mle_H0 (log likelihood with maximum likelihood ) is zero?
                  (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null)))
                                                1)))
                    (hash-set! per-snp-params (car markers)
