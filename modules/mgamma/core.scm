@@ -1071,10 +1071,10 @@ Create and return a new matrix."
 Use KINSHIP-MTX, PHENO-MTX, and CVT-MTX for computations, but mostly
 clean them up into new ones and use those."
   (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
-         (useful-snps (useful-snps geno-mtx markers pheno-mtx cvt-mtx))
          (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
          (useful-geno (useful-geno-mtx geno-mtx useful-individuals))
          (useful-pheno (useful-pheno-mtx pheno-mtx useful-individuals))
+         (useful-snps (useful-snps useful-geno markers useful-pheno cvt-mtx))
          (cvt-mtx (or cvt-mtx
                       ;; This is not useful-kinship so that
                       ;; calc-covariate-pheno gets the right size of
