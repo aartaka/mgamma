@@ -654,42 +654,37 @@ Return a (MATRIX MARKER-NAMES) list."
   "Calculate (BETA TAU SE P-SCORE P-WALD) for UAB etc."
   (mtx:with
    (pab (+ n-covariates 2) (n-index n-covariates) 0)
-   (mtx:with
-    ;; Yes, ppab is unused. But removing it causes random complex
-    ;; numbers down the line somewhy. Check back again later. --
-    ;; aartaka
-    (ppab (+ n-covariates 2) (n-index n-covariates) 0)
+   (vec:with
+    (v-temp (vec:length eigenvalues) eigenvalues)
+    (vec:scale! v-temp l)
     (vec:with
-     (v-temp (vec:length eigenvalues) eigenvalues)
-     (vec:scale! v-temp l)
-     (vec:with
-      (hi-eval (vec:length eigenvalues) 1)
-      (vec:add-constant! v-temp 1)
-      (vec:divide! hi-eval v-temp)
-      (calc-pab! uab pab hi-eval n-covariates)
-      (let* ((index-yy (abindex (+ n-covariates 2) (+ n-covariates 2)
-                                n-covariates))
-             (index-xx (abindex (+ n-covariates 1) (+ n-covariates 1)
-                                n-covariates))
-             (index-xy (abindex (+ n-covariates 2) (+ n-covariates 1)
-                                n-covariates))
-             (p-yy (mtx:get pab n-covariates index-yy))
-             (p-xx (mtx:get pab n-covariates index-xx))
-             (p-xy (mtx:get pab n-covariates index-xy))
-             (px-yy (mtx:get pab (1+ n-covariates) index-yy))
-             (df (- n-inds n-covariates 1))
-             (beta (/ p-xy p-xx))
-             (tau (/ df px-yy))
-             ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
-             (d (/ 1 (* tau p-xx)))
-             (se (sqrt (abs d)))
-             (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
-             (p-score (gsl-cdf-fdist-q
-                       (/ (* n-inds p-xy p-xy)
-                          (* p-yy p-xx))
-                       1.0
-                       df)))
-        (values beta tau se p-score p-wald)))))))
+     (hi-eval (vec:length eigenvalues) 1)
+     (vec:add-constant! v-temp 1)
+     (vec:divide! hi-eval v-temp)
+     (calc-pab! uab pab hi-eval n-covariates)
+     (let* ((index-yy (abindex (+ n-covariates 2) (+ n-covariates 2)
+                               n-covariates))
+            (index-xx (abindex (+ n-covariates 1) (+ n-covariates 1)
+                               n-covariates))
+            (index-xy (abindex (+ n-covariates 2) (+ n-covariates 1)
+                               n-covariates))
+            (p-yy (mtx:get pab n-covariates index-yy))
+            (p-xx (mtx:get pab n-covariates index-xx))
+            (p-xy (mtx:get pab n-covariates index-xy))
+            (px-yy (mtx:get pab (1+ n-covariates) index-yy))
+            (df (- n-inds n-covariates 1))
+            (beta (/ p-xy p-xx))
+            (tau (/ df px-yy))
+            ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
+            (d (/ 1 (* tau p-xx)))
+            (se (sqrt (abs d)))
+            (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
+            (p-score (gsl-cdf-fdist-q
+                      (/ (* n-inds p-xy p-xy)
+                         (* p-yy p-xx))
+                      1.0
+                      df)))
+       (values beta tau se p-score p-wald))))))
 
 (define (calc-covariate-pheno y w useful-pheno-mtx cvt-mtx useful-individuals)
   "Put USEFUL-PHENO-MTX data into Y and CVT-MTX into W.
@@ -1180,20 +1175,20 @@ clean them up into new ones and use those."
        params-table))))
 
 
-;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
-;; (define geno-mtx (first geno))
-;; (define geno-markers (second geno))
-;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940.pheno.txt"))
+(define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+(define geno-mtx (first geno))
+(define geno-markers (second geno))
+(define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
 
-;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
-;; (define useful-inds (useful-individuals pheno-mtx #f))
-;; (define params (analyze geno-mtx geno-markers kinship
-;;                         pheno-mtx #f))
-;; (begin (hash-map->list (lambda (key value)
-;;                          (format #t "~a: ~s~%" key value))
-;;                        params)
-;;        #t)
+(define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
+(define useful-inds (useful-individuals pheno-mtx #f))
+(define params (analyze geno-mtx geno-markers kinship
+                        pheno-mtx #f))
+(begin (hash-map->list (lambda (key value)
+                         (format #t "~a: ~s~%" key value))
+                       params)
+       #t)
 ;; (define uab (analyze geno-mtx geno-markers kinship
 ;;                      pheno-mtx #f))
 ;; (define uty (analyze geno-mtx geno-markers kinship
