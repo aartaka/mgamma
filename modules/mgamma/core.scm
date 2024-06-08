@@ -655,6 +655,9 @@ Return a (MATRIX MARKER-NAMES) list."
   (mtx:with
    (pab (+ n-covariates 2) (n-index n-covariates) 0)
    (mtx:with
+    ;; Yes, ppab is unused. But removing it causes random complex
+    ;; numbers down the line somewhy. Check back again later. --
+    ;; aartaka
     (ppab (+ n-covariates 2) (n-index n-covariates) 0)
     (vec:with
      (v-temp (vec:length eigenvalues) eigenvalues)
