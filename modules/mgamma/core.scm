@@ -773,9 +773,10 @@ have closures for that in Scheme."
                      (p-yy (mtx:get pab nc-total index-ww))
                      (pp-yy (mtx:get ppab nc-total index-ww))
                      (y-pkp-y (/ (- p-yy pp-yy) l)))
-                (+ (* -0.5 trace-pk)
-                   (/ (* 0.5 df y-pkp-y)
-                      p-yy)))))))))))
+                (real-part
+                 (+ (* -0.5 trace-pk)
+                    (/ (* 0.5 df y-pkp-y)
+                       p-yy))))))))))))
    ;; LogL_dev2
    (lambda (l)
      (let ((nc-total (1+ n-covariates))
@@ -820,12 +821,13 @@ have closures for that in Scheme."
                                       ppp-yy
                                       (- (* 2 pp-yy)))
                                    (* l l))))
-                  (- (* 1/2 trace-hik-hik)
-                     (* 1/2
-                        n-inds
-                        (- (* 2 ypkpkpy p-yy)
-                           (* ypkpy ypkpy))
-                        (/ 1 (* p-yy p-yy)))))))))))))))
+                  (real-part
+                   (- (* 1/2 trace-hik-hik)
+                      (* 1/2
+                         n-inds
+                         (- (* 2 ypkpkpy p-yy)
+                            (* ypkpy ypkpy))
+                         (/ 1 (* p-yy p-yy))))))))))))))))
    ;; LogL_dev12
    (lambda (l)
      (let ((nc-total (1+ n-covariates))
@@ -880,7 +882,7 @@ have closures for that in Scheme."
                                    (- (* 2 ypkpkpy p-yy)
                                       (* ypkpy ypkpy))
                                    (/ 1 (* p-yy p-yy))))))
-                  (values dev1 dev2))))))))))))
+                  (values (real-part dev1) (real-part dev2)))))))))))))
    ;; LogL_f
    (lambda (l)
      (let ((nc-total (1+ n-covariates))
@@ -915,7 +917,7 @@ have closures for that in Scheme."
                  (result (- c
                             (/ lodget-h 2)
                             (* 1/2 n-inds (log p-yy)))))
-            result))))))))
+            (real-part result)))))))))
 
 (define (calc-lambda n-inds n-covariates uab eval)
   "Calculate lambda for alternative model (UAB from `calc-uab-alt!')
