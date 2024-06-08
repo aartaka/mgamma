@@ -1113,6 +1113,11 @@ clean them up into new ones and use those."
     (center-matrix! useful-kinship)
     (receive (eval u)
         (eigendecomposition-zeroed useful-kinship)
+      ((foreign-library-function
+        gsl:libgsl "gsl_sort_vector"
+        #:return-type void
+        #:arg-types `(*))
+       (vec:unwrap eval))
       (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
              (uty (blas:gemm u y #:transpose-a blas:+transpose+))
              (y-col (mtx:column->vec! y 0))
