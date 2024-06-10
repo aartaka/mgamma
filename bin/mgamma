@@ -140,8 +140,7 @@ mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|t
            (let* ((pheno-mtx (pheno.txt->pheno-mtx (option-ref options 'pheno #f)))
                   (cvt-mtx (if (option-ref options 'covar #f)
                                (covariates.txt->cvt-mtx (option-ref options 'covar #f))
-                               #f))
-                  (useful-individuals (useful-individuals pheno-mtx cvt-mtx)))
+                               #f)))
              (snp-params->assoc.txt
               (analyze geno-mtx markers (if kin-txt?
                                             (cxx.txt->kinship kin)
