@@ -651,6 +651,9 @@ Return a (MATRIX MARKER-NAMES) list."
     (values evalues-vec evectors-mtx)))
 
 (define (eigendecomposition-sorted kinship)
+  "Eigen-decompose KINSHIP and sort the results.
+Sorts eigenvectors in the same order as eigenvalues (ascending order).
+Uses `eigendecomposition-zeroed' underneath."
   (receive (evalues-vec evectors-mtx)
       (eigendecomposition-zeroed kinship)
     ;; evectors-mtx has eigenvectors as _columns_
@@ -667,10 +670,10 @@ Return a (MATRIX MARKER-NAMES) list."
                permutations
                (vec:unwrap evalues-vec)))
            (permutations
-             (list->vector
-              (parse-c-struct (second (parse-c-struct permutations (list size_t '*)))
-                              (make-list evalues-length size_t))))
-            (visited (make-vector evalues-length #f)))
+            (list->vector
+             (parse-c-struct (second (parse-c-struct permutations (list size_t '*)))
+                             (make-list evalues-length size_t))))
+           (visited (make-vector evalues-length #f)))
       ;; Permutations are (A B C D) where A is the index of the
       ;; element that should be stored there (say the one under D, so
       ;; perm[A] = D). NOT the new position of the element currently
@@ -769,9 +772,10 @@ Only include the data for USEFUL-INDIVIDUALS."
     (vec:free w gw)
     mtx))
 
-;; Defining π here, because I haven't found it in Guile standard lib
-;; (at least in manual).
-(define +pi+ (acos -1))
+;; Defining π here (as the largest precision fraction from Wikipedia),
+;; because I haven't found it in Guile standard lib (at least in
+;; the manual).
+(define +pi+ 245850922/78256779)
 
 ;; This function exists for the sole reason of closing over UAB et
 ;; al. while passing the generated functions to GSL root solvers.
@@ -963,7 +967,7 @@ have closures for that in Scheme."
 
 (define (calc-lambda n-inds n-covariates uab eval)
   "Calculate lambda for alternative model (UAB from `calc-uab-alt!')
-Return a list of (LAMBDA LOGF)."
+Return (LAMBDA LOGF) values."
   (match (make-log-functions n-inds n-covariates uab eval)
     ((log-l-dev1 log-l-dev2 log-l-dev12 log-l-f)
      (let* ((lambda-interval (/ (log (/ (l-max) (l-min))) (n-regions)))
@@ -1082,21 +1086,25 @@ Create and return a new matrix."
     new-mtx))
 
 (define (useful-geno-mtx-per-snps geno-mtx markers useful-snps)
-  (let* ((tmp (vec:alloc (mtx:columns geno-mtx) 0))
-         (new-rows (hash-count (lambda (k v) v) useful-snps))
-         (new-mtx (mtx:alloc new-rows (mtx:columns geno-mtx) 0))
-         (i 0))
-    (do ((markers markers (cdr markers))
-         (row 0 (1+ row)))
-        ((= i new-rows))
-      (when (hash-ref useful-snps (car markers) #f)
-        (mtx:row->vec! geno-mtx row tmp)
-        (mtx:vec->row! tmp new-mtx i)
-        (set! i (1+ i))))
-    (vec:free tmp)
-    new-mtx))
+  "Only retain the USEFUL-SNPS in the GENO-MTX (ordered by MARKERS).
+Return a new matrix with cleaned-up SNPs."
+  (vec:with
+   (tmp (mtx:columns geno-mtx) 0)
+   (let* ((new-rows (hash-count (lambda (k v) v) useful-snps))
+          (new-mtx (mtx:alloc new-rows (mtx:columns geno-mtx) 0))
+          (i 0))
+     (do ((markers markers (cdr markers))
+          (row 0 (1+ row)))
+         ((= i new-rows))
+       (when (hash-ref useful-snps (car markers) #f)
+         (mtx:row->vec! geno-mtx row tmp)
+         (mtx:vec->row! tmp new-mtx i)
+         (set! i (1+ i))))
+     new-mtx)))
 
 (define (useful-pheno-mtx pheno-mtx useful-inds)
+  "Only retain USEFUL-INDividualS in PHENO-MTX.
+Return a new matrix with cleaned-up ones."
   (let* ((n-useful (count identity useful-inds))
          (new-mtx (mtx:alloc n-useful (mtx:columns pheno-mtx))))
     (do ((useful-inds useful-inds (cdr useful-inds))
