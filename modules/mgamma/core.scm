@@ -724,8 +724,7 @@ Return a (MATRIX MARKER-NAMES) list."
             (beta (/ p-xy p-xx))
             (tau (/ df px-yy))
             ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
-            (d (/ 1 (* tau p-xx)))
-            (se (sqrt (abs d)))
+            (se (sqrt (abs (/ 1 (* tau p-xx)))))
             (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
             (p-score (gsl-cdf-fdist-q
                       (/ (* n-inds p-xy p-xy)
