@@ -1196,12 +1196,10 @@ clean them up into new ones and use those."
                              beta se
                              1e-5 ;; lambda-remle default
                              lam
-                             ;; p-wald is calculated in
-                             ;; rlscore, although GEMMA has a
-                             ;; separate function for
-                             ;; it. Otherwise I was unable to
-                             ;; find where it comes from --
-                             ;; aartaka
+                             ;; p-wald is calculated in rlscore,
+                             ;; although GEMMA has a separate function
+                             ;; for it. Otherwise I was unable to find
+                             ;; where it comes from -- aartaka
                              p-wald
                              p-ltr p-score logl-alt)))))))))
     per-snp-params))
