@@ -15,10 +15,10 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl root) #:prefix root:)
   #:use-module ((gsl linear-algebra) #:prefix linalg:)
+  #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (system foreign)
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
-  #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (rnrs base)
   #:use-module (json)
   #:export (mapsize
