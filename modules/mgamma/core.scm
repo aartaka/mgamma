@@ -1134,23 +1134,25 @@ Return a new matrix with cleaned-up ones."
       (lambda ()
         (mtx:free uab)))))
 
-(define (analyze geno-mtx markers kinship-mtx pheno-mtx cvt-mtx)
-  "Return the per-snp params for MARKERS in GENO-MTX.
-Use KINSHIP-MTX, PHENO-MTX, and CVT-MTX for computations, but mostly
-clean them up into new ones and use those."
-  (let* ((useful-individuals (useful-individuals pheno-mtx cvt-mtx))
-         (useful-kinship (useful-kinship-mtx kinship-mtx useful-individuals))
-         (useful-geno (useful-geno-mtx geno-mtx useful-individuals))
-         (useful-pheno (useful-pheno-mtx pheno-mtx useful-individuals))
-         (useful-snps (useful-snps useful-geno markers useful-pheno cvt-mtx))
-         (cvt-mtx (or cvt-mtx
-                      ;; This is not useful-kinship so that
-                      ;; calc-covariate-pheno gets the right size of
-                      ;; vct-mtx.
-                      (mtx:alloc (mtx:rows kinship-mtx) 1 1)))
+(define (analyze geno markers kinship pheno cvt)
+  "Return the per-snp params for MARKERS in GENO.
+Use KINSHIP (optional, might be #f), PHENO, and CVT (all matrices) for
+computations, but mostly clean them up into new ones and use those."
+  (let* ((useful-individuals (useful-individuals pheno cvt))
+         (useful-geno (useful-geno-mtx geno useful-individuals))
+         (useful-pheno (useful-pheno-mtx pheno useful-individuals))
+         (useful-snps (useful-snps useful-geno markers useful-pheno cvt))
+         (cvt (or cvt
+                  ;; This is not useful-kinship so that
+                  ;; calc-covariate-pheno gets the right size of
+                  ;; cvt-mtx.
+                  (mtx:alloc (mtx:columns geno) 1 1)))
          (useful-geno (useful-geno-mtx-per-snps useful-geno markers useful-snps))
-         (n-covariates (mtx:columns cvt-mtx))
-         (n-phenotypes (mtx:columns pheno-mtx))
+         (useful-kinship (if kinship
+                             (useful-kinship-mtx kinship useful-individuals)
+                             (kinship-mtx useful-geno markers useful-snps)))
+         (n-covariates (mtx:columns cvt))
+         (n-phenotypes (mtx:columns useful-pheno))
          (n-useful-inds (mtx:rows useful-kinship))
          (n-markers (mtx:rows useful-geno))
          (y (mtx:alloc n-useful-inds n-phenotypes 0))
@@ -1158,9 +1160,11 @@ clean them up into new ones and use those."
          (b (mtx:alloc n-phenotypes n-covariates))
          (n-index (n-index n-covariates))
          (per-snp-params (make-hash-table n-markers)))
+    (format #t "useful-kinship is ~s~%" (mtx:->2d-vector useful-kinship))
     (cleanup-mtx useful-geno)
-    (calc-covariate-pheno y w useful-pheno cvt-mtx useful-individuals)
+    (calc-covariate-pheno y w useful-pheno cvt useful-individuals)
     (center-matrix! useful-kinship)
+    (format #t "y is ~s~%" (mtx:->2d-vector y))
     (receive (eval u)
         (eigendecomposition-sorted useful-kinship)
       (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
@@ -1169,6 +1173,14 @@ clean them up into new ones and use those."
              (uty-col (mtx:column->vec! uty 0))
              (uab (calc-uab-null utw uty-col))
              (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
+        (format #t "eval is ~s~%" (vec:->vector eval))
+        ;; Pattern for wrong signs is #(#t #f #t #f #t #t #f #t #f #t
+        ;; #t #f #t #t #t #t #f #t #f #f #t #t #t #f #f #f #f #f #t #f
+        ;; #f #f #t #f #t #f #t #t #t #t #t #f #f #f #f #f #f #f #f #t
+        ;; #f #t #f #t #f #t #f #t #t #f #f #t #f #f #t #f #f) for BXD
+        ;; data. Try to generalize? Doesn't generalize that well
+        ;; --aartaka
+        (format #t "U is ~s~%" (mtx:->2d-vector u))
         (when (= 1 n-phenotypes)
           (receive (lam logl-h0)
               (calc-lambda-null utw uty-col eval)
