@@ -648,57 +648,7 @@ Return a (MATRIX MARKER-NAMES) list."
       (when (< (abs (vec:get evalues-vec i)) 1e-10)
         ;; pylmm uses 1e-6 instead
         (vec:set! evalues-vec i 0)))
-    (values evalues-vec evectors-mtx)))
-
-(define (eigendecomposition-sorted kinship)
-  "Eigen-decompose KINSHIP and sort the results.
-Sorts eigenvectors in the same order as eigenvalues (ascending order).
-Uses `eigendecomposition-zeroed' underneath."
-  (receive (evalues-vec evectors-mtx)
-      (eigendecomposition-zeroed kinship)
-    ;; evectors-mtx has eigenvectors as _columns_
-    (let* ((backup-vec (vec:alloc (mtx:rows evectors-mtx)))
-           (swap-vec (vec:alloc (mtx:rows evectors-mtx)))
-           (evalues-length (vec:length evalues-vec))
-           (data (make-c-struct (make-list evalues-length size_t)
-                                (make-list evalues-length 0)))
-           (permutations (make-c-struct `(,size_t *) (list evalues-length data)))
-           (_ ((foreign-library-function
-                gsl:libgsl "gsl_sort_vector_index"
-                #:return-type int
-                #:arg-types '(* *))
-               permutations
-               (vec:unwrap evalues-vec)))
-           (permutations
-            (list->vector
-             (parse-c-struct (second (parse-c-struct permutations (list size_t '*)))
-                             (make-list evalues-length size_t))))
-           (visited (make-vector evalues-length #f)))
-      ;; Permutations are (A B C D) where A is the index of the
-      ;; element that should be stored there (say the one under D, so
-      ;; perm[A] = D). NOT the new position of the element currently
-      ;; residing in A! I made this mistake. -- aartaka
-      (while (vector-index (cut not <>) visited)
-        (let* ((first-unvisited (vector-index (cut not <>) visited))
-               (backup-value (vec:get evalues-vec first-unvisited)))
-          (mtx:column->vec! evectors-mtx first-unvisited backup-vec)
-          (do ((idx first-unvisited (vector-ref permutations idx))
-               (next-idx (vector-ref permutations first-unvisited)
-                         (vector-ref permutations next-idx)))
-              ((vector-ref visited next-idx)
-               ;; Search always ends on the first element in the
-               ;; replacement sequence (backup-value/backup-vec.)
-               (mtx:vec->column! backup-vec evectors-mtx idx)
-               (vec:set! evalues-vec idx backup-value)
-               (vector-set! visited idx #t))
-            ;; Swap columns in eigenvectors
-            (mtx:column->vec! evectors-mtx next-idx swap-vec)
-            (mtx:vec->column! swap-vec evectors-mtx idx)
-            ;; Swap values in eigenvalues
-            (vec:set! evalues-vec idx (vec:get evalues-vec next-idx))
-            ;; Mark the index as visited
-            (vector-set! visited idx #t))))
-      (vec:free backup-vec swap-vec))
+    (eigen:sort! evalues-vec evectors-mtx)
     (values evalues-vec evectors-mtx)))
 
 (define (rlscore l n-covariates n-inds eigenvalues uab)
@@ -1166,7 +1116,7 @@ computations, but mostly clean them up into new ones and use those."
     (center-matrix! useful-kinship)
     (format #t "y is ~s~%" (mtx:->2d-vector y))
     (receive (eval u)
-        (eigendecomposition-sorted useful-kinship)
+        (eigendecomposition-zeroed useful-kinship)
       (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
              (uty (blas:gemm u y #:transpose-a blas:+transpose+))
              (y-col (mtx:column->vec! y 0))
