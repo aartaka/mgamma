@@ -693,7 +693,6 @@ Only include the data for USEFUL-INDIVIDUALS."
   (do ((n-covariates (if cvt-mtx
                          (mtx:columns cvt-mtx)
                          1))
-       (n-phenotypes (mtx:columns useful-pheno-mtx))
        (ci-test 0 (if (car inds)
                       (1+ ci-test)
                       ci-test))
