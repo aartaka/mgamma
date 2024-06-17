@@ -33,19 +33,19 @@ mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.lmdb -p pheno.txt -o kinship
 To compute the LMM we use
 
 ```
-mgamma gwa -g geno.mdb -p pheno.txt [--map-size 10M] -k kinship.mdb -o gwa.mdb
+mgamma gwa -g geno.mdb -p pheno.txt [--map-size 10M] -k kinship.mdb -o assoc.txt
 ```
 
 (note the annotations are now part of the geno file and we use GEMMA's -lmm 9 by default).
 
-When no file names are given we default to above names, so:
+TODO: When no file names are given we default to above names, so:
 
 ```
 mgamma kinship
 mgamma gwa
 ```
 
-should compute the same kinship.lmdb and gwa.lmdb files.
+should compute the same kinship.lmdb and assoc.txt files.
 
 ## LOCO
 
