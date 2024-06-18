@@ -309,23 +309,28 @@ Return a (MATRIX MARKER-NAMES) list."
     (list mtx (map first lines))))
 
 (define (cleanup-mtx mtx)
+  "Plug mean instead of NaNs, whenever possible.
+Also subtract mean from all the values to 'center' them."
   (do ((mtx-rows (mtx:rows mtx))
        (mtx-cols (mtx:columns mtx))
        (row 0 (1+ row)))
       ((= row mtx-rows))
-    (match (do ((col 0 (1+ col))
-                (is-nan? (nan? (mtx:get mtx row 0))
-                         (nan? (mtx:get mtx row col)))
-                (sum 0 (if is-nan?
-                           sum
-                           (+ sum (mtx:get mtx row col))))
-                (nans '() (if is-nan?
-                              (cons col nans)
-                              nans)))
-               ((= col mtx-cols)
-                (list sum nans)))
+    (match (let rec ((col 0)
+                     (nans '())
+                     (sum 0))
+             (if (= col mtx-cols)
+                 (list sum nans)
+                 (rec (1+ col)
+                      (if (nan? (mtx:get mtx row col))
+                          (cons col nans)
+                          nans)
+                      (if (nan? (mtx:get mtx row col))
+                          sum
+                          (+ sum (mtx:get mtx row col))))))
       ((sum nans)
-       (let ((mean (/ sum (- mtx-cols (length nans)))))
+       (let ((mean (if (= mtx-cols (length nans))
+                       0
+                       (/ sum (- mtx-cols (length nans))))))
          (do ((nans nans (cdr nans)))
              ((null? nans))
            (mtx:set! mtx row (car nans) mean))
