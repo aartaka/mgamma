@@ -264,10 +264,13 @@ The values are `double' arrays with one value per individual."
         (lambda (key data)
           (let ((individuals (/ (mdb:val-size data) float-size))
                 (meta? (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)))
-            (unless mtx
+            (when (and (not mtx)
+                       (not meta?))
               ;; Markers x individuals
-              (set! mtx (mtx:alloc (mdb:stat-entries (mdb:dbi-stat txn dbi))
-                                   individuals)))
+              (set! mtx (mtx:alloc
+                         ;; Meta record is mandatory, I guess?
+                         (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
+                         individuals)))
             (if meta?
                 (set! meta (json-string->scm (mdb:val-data-string data)))
                 (do ((i 0 (1+ i))
