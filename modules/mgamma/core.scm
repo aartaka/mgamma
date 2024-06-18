@@ -177,7 +177,10 @@ The values are `double' arrays with one value per individual."
            (set! nans (1+ nans))
            (set! sum (+ value sum))))
      vec)
-    (/ sum (- (vec:length vec) nans))))
+    (if (or (zero? (vec:length vec))
+            (= (vec:length vec) nans))
+        0
+        (/ sum (- (vec:length vec) nans)))))
 
 (define (vec-replace-nan vec val)
   (vec:for-vec
