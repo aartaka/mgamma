@@ -102,11 +102,13 @@ Return a list of lists of values."
          file
          (call-with-port (open-input-file file)
            (lambda (port)
-             (let read-lines ((line (first (%read-line port))))
-               (if (eof-object? line)
-                   '()
-                   (cons (string-separate line)
-                         (read-lines (first (%read-line port)))))))))
+             (remove
+              null?
+              (let read-lines ((line (first (%read-line port))))
+                (if (eof-object? line)
+                    '()
+                    (cons (string-separate line)
+                          (read-lines (first (%read-line port))))))))))
         (hash-ref %read-separated-lines-cache file))))
 
 ;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
