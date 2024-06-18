@@ -725,7 +725,7 @@ Only include the data for USEFUL-INDIVIDUALS."
     (blas:syr2! gw w mtx #:alpha (/ -1 size))
     (let ((d (blas:dot w gw)))
       (blas:syr! w mtx #:alpha (/ d (expt size 2))))
-    ;; GEMMA says it's transpose, but I don't believe it -- aartaka.
+    ;; GEMMA says it's transpose, but I don't believe it --aartaka.
     (do ((i 0 (1+ i)))
         ((= i size))
       (do ((j 0 (1+ j)))
