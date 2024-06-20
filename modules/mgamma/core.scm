@@ -16,6 +16,7 @@
   #:use-module ((gsl root) #:prefix root:)
   #:use-module ((gsl linear-algebra) #:prefix linalg:)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
+  #:use-module ((lapack lapack) #:prefix lapack:)
   #:use-module (system foreign)
   #:use-module (system foreign-library)
   #:use-module (rnrs bytevectors)
@@ -654,14 +655,29 @@ Also subtract mean from all the values to 'center' them."
 
 (define (eigendecomposition-zeroed kinship)
   "Eigendecomposition, but zero the values below threshold."
-  (receive (evalues-vec evectors-mtx)
-      (eigen:solve! kinship)
+  (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
+        (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
+    (lapack:dsyevr
+     lapack:+row-major+
+     ;; TODO: Decode these and put it back into Guile-LAPACK.
+     (char->integer #\V) (char->integer #\A)
+     lapack:+lower+
+     (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
+     0.0 0.0 0 0 1.0e-7
+     ;; Throwaway pointer.
+     (make-c-struct (list int) (list 0))
+     (vec:data evalues-vec) (mtx:data evectors-mtx)
+     (mtx:rows kinship)
+     ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what this
+     ;; means -- aartaka
+     (make-c-struct
+      (make-list (* 2 (mtx:rows kinship)) int)
+      (make-list (* 2 (mtx:rows kinship)) 0)))
     (do ((i 0 (1+ i)))
         ((= i (vec:length evalues-vec)))
       (when (< (abs (vec:get evalues-vec i)) 1e-10)
         ;; pylmm uses 1e-6 instead
         (vec:set! evalues-vec i 0)))
-    (eigen:sort! evalues-vec evectors-mtx)
     (values evalues-vec evectors-mtx)))
 
 (define (rlscore l n-covariates n-inds eigenvalues uab)
@@ -1143,6 +1159,7 @@ computations, but mostly clean them up into new ones and use those."
         ;; data. Try to generalize? Doesn't generalize that well
         ;; --aartaka
         (format #t "U is ~s~%" (mtx:->2d-vector u))
+        (format #t "UtW is ~s~%" (mtx:->2d-vector utw))
         (when (= 1 n-phenotypes)
           (receive (lam logl-h0)
               (calc-lambda-null utw uty-col eval)
@@ -1197,16 +1214,16 @@ computations, but mostly clean them up into new ones and use those."
        params-table))))
 
 
-;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
-;; (define geno-mtx (first geno))
-;; (define geno-markers (second geno))
-;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
+(define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+(define geno-mtx (first geno))
+(define geno-markers (second geno))
+(define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
 
-;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
+(define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
-;; (define params (analyze geno-mtx geno-markers kinship
-;;                         pheno-mtx #f))
+(define params (analyze geno-mtx geno-markers kinship
+                        pheno-mtx #f))
 ;; (begin (hash-map->list (lambda (key value)
 ;;                          (format #t "~a: ~s~%" key value))
 ;;                        params)
