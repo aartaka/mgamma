@@ -1,1 +1,1 @@
-/home/aartaka/git/mgamma/.guix/mgamma-package.scm
+.guix/mgamma-package.scm
