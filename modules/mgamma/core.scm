@@ -659,17 +659,17 @@ Also subtract mean from all the values to 'center' them."
         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
     (lapack:dsyevr
      lapack:+row-major+
-     ;; TODO: Decode these and put it back into Guile-LAPACK.
+     ;; TODO: Decode these and put them back into Guile-LAPACK.
      (char->integer #\V) (char->integer #\A)
      lapack:+lower+
      (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
      0.0 0.0 0 0 1.0e-7
-     ;; Throwaway pointer.
+     ;; Throwaway pointer M.
      (make-c-struct (list int) (list 0))
      (vec:data evalues-vec) (mtx:data evectors-mtx)
      (mtx:rows kinship)
      ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what this
-     ;; means -- aartaka
+     ;; means. --aartaka
      (make-c-struct
       (make-list (* 2 (mtx:rows kinship)) int)
       (make-list (* 2 (mtx:rows kinship)) 0)))
