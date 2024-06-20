@@ -1214,16 +1214,16 @@ computations, but mostly clean them up into new ones and use those."
        params-table))))
 
 
-(define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
-(define geno-mtx (first geno))
-(define geno-markers (second geno))
-(define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
+;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+;; (define geno-mtx (first geno))
+;; (define geno-markers (second geno))
+;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
 
-(define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
+;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
-(define params (analyze geno-mtx geno-markers kinship
-                        pheno-mtx #f))
+;; (define params (analyze geno-mtx geno-markers kinship
+;;                         pheno-mtx #f))
 ;; (begin (hash-map->list (lambda (key value)
 ;;                          (format #t "~a: ~s~%" key value))
 ;;                        params)
