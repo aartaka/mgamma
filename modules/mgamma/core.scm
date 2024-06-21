@@ -658,10 +658,7 @@ Also subtract mean from all the values to 'center' them."
   (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
     (lapack:dsyevr
-     lapack:+row-major+
-     ;; TODO: Decode these and put them back into Guile-LAPACK.
-     (char->integer #\V) (char->integer #\A)
-     lapack:+lower+
+     lapack:+row-major+ lapack:+eigenvalues-and-eigenvectors+ lapack:+range-all+ lapack:+lower+
      (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
      0.0 0.0 0 0 1.0e-7
      ;; Throwaway pointer M.
