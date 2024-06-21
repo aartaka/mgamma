@@ -1138,11 +1138,9 @@ computations, but mostly clean them up into new ones and use those."
          (b (mtx:alloc n-phenotypes n-covariates))
          (n-index (n-index n-covariates))
          (per-snp-params (make-hash-table n-markers)))
-    (format #t "useful-kinship is ~s~%" (mtx:->2d-vector useful-kinship))
     (cleanup-mtx useful-geno)
     (calc-covariate-pheno y w useful-pheno cvt useful-individuals)
     (center-matrix! useful-kinship)
-    (format #t "y is ~s~%" (mtx:->2d-vector y))
     (receive (eval u)
         (eigendecomposition-zeroed useful-kinship)
       (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
@@ -1151,15 +1149,6 @@ computations, but mostly clean them up into new ones and use those."
              (uty-col (mtx:column->vec! uty 0))
              (uab (calc-uab-null utw uty-col))
              (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
-        (format #t "eval is ~s~%" (vec:->vector eval))
-        ;; Pattern for wrong signs is #(#t #f #t #f #t #t #f #t #f #t
-        ;; #t #f #t #t #t #t #f #t #f #f #t #t #t #f #f #f #f #f #t #f
-        ;; #f #f #t #f #t #f #t #t #t #t #t #f #f #f #f #f #f #f #f #t
-        ;; #f #t #f #t #f #t #f #t #t #f #f #t #f #f #t #f #f) for BXD
-        ;; data. Try to generalize? Doesn't generalize that well
-        ;; --aartaka
-        (format #t "U is ~s~%" (mtx:->2d-vector u))
-        (format #t "UtW is ~s~%" (mtx:->2d-vector utw))
         (when (= 1 n-phenotypes)
           (receive (lam logl-h0)
               (calc-lambda-null utw uty-col eval)
