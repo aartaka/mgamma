@@ -118,13 +118,13 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
 
 (define (gwa options)
   (unless (option-ref options 'help #f)
-    (ensure-options options 'output 'kinship 'geno 'pheno))
+    (ensure-options options 'output 'geno 'pheno))
   (let* ((help (option-ref options 'help #f))
          (output (option-ref options 'output #f)))
     (cond
      (help
       (format #t "Run a linear mixed model on genotype data:
-mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
+mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(lmdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
      (else
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
@@ -132,7 +132,8 @@ mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|t
       (let* ((geno (option-ref options 'geno #f))
              (geno-txt? (txt-file? geno))
              (kin (option-ref options 'kinship #f))
-             (kin-txt? (txt-file? kin)))
+             (kin-txt? (and kin
+                            (txt-file? kin))))
         (match (if geno-txt?
                    (geno.txt->genotypes-mtx geno)
                    (lmdb->genotypes-mtx (dirname geno)))
@@ -142,9 +143,10 @@ mgamma gwa [--map-size 10000000] --kinship kinship.(txt|mdb) --geno geno.(lmdb|t
                                (covariates.txt->cvt-mtx (option-ref options 'covar #f))
                                #f)))
              (snp-params->assoc.txt
-              (analyze geno-mtx markers (if kin-txt?
-                                            (cxx.txt->kinship kin)
-                                            (lmdb->kinship (dirname kin)))
+              (analyze geno-mtx markers (cond
+                                         (kin-txt? (cxx.txt->kinship kin))
+                                         (kin (lmdb->kinship (dirname kin)))
+                                         (else #f))
                        pheno-mtx cvt-mtx)
               (option-ref options 'output #f))))))))))
 
