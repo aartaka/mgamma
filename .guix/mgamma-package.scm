@@ -10,7 +10,8 @@
  #:use-module (guix git-download)
  #:use-module ((guix licenses) #:prefix license:)
  #:use-module (guile-gsl-package)
- #:use-module (guile-lmdb-package))
+ #:use-module (guile-lmdb-package)
+ #:use-module (guile-lapack-package))
 
 (define-public mgamma-git
   (package
