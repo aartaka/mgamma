@@ -54,7 +54,8 @@
                   guile-3.0
                   guile-json-4
                   guile-lmdb-git
-                  guile-gsl-git))
+                  guile-gsl-git
+                  guile-lapack-git))
     (home-page "https://github.com/aartaka/guile-gemma")
     (synopsis "")
     (description "")
