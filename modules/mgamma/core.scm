@@ -1109,10 +1109,13 @@ Return a new matrix with cleaned-up ones."
       (lambda ()
         (mtx:free uab)))))
 
-(define (analyze geno markers kinship pheno cvt)
+(define (analyze geno markers kinship eigenvectors pheno cvt)
   "Return the per-snp params for MARKERS in GENO.
-Use KINSHIP (optional, might be #f), PHENO, and CVT (all matrices) for
-computations, but mostly clean them up into new ones and use those."
+Use KINSHIP (optional, might be #f), EIGENVECTORS, PHENO, and CVT (all
+matrices) for computations, but mostly clean them up into new ones and
+use those.
+KINSHIP is computed from GENO when #f.
+EIGENVECTORS are computed from KINSHIP when #f."
   (let* ((useful-individuals (useful-individuals pheno cvt))
          (useful-geno (useful-geno-mtx geno useful-individuals))
          (useful-pheno (useful-pheno-mtx pheno useful-individuals))
@@ -1208,7 +1211,7 @@ computations, but mostly clean them up into new ones and use those."
 
 ;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
-;; (define params (analyze geno-mtx geno-markers kinship
+;; (define params (analyze geno-mtx geno-markers kinship #f
 ;;                         pheno-mtx #f))
 ;; (begin (hash-map->list (lambda (key value)
 ;;                          (format #t "~a: ~s~%" key value))
