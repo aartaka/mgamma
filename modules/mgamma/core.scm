@@ -1208,7 +1208,11 @@ EIGENVECTORS are computed from KINSHIP when #f."
     (center-matrix! useful-kinship)
     (receive (eval u)
         (eigendecomposition-zeroed useful-kinship)
-      (let* ((utw (blas:gemm u w #:transpose-a blas:+transpose+))
+      (let* ((u
+              ;; Necessary because GSL/LAPACKE don't always provide
+              ;; the right signs for eigenvectors.
+              (or eigenvectors u))
+             (utw (blas:gemm u w #:transpose-a blas:+transpose+))
              (uty (blas:gemm u y #:transpose-a blas:+transpose+))
              (y-col (mtx:column->vec! y 0))
              (uty-col (mtx:column->vec! uty 0))
