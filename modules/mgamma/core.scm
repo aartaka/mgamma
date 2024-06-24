@@ -680,41 +680,6 @@ Also subtract mean from all the values to 'center' them."
         (vec:set! evalues-vec i 0)))
     (values evalues-vec evectors-mtx)))
 
-(define (rlscore l n-covariates n-inds eigenvalues uab)
-  "Calculate (BETA TAU SE P-SCORE P-WALD) for UAB etc."
-  (mtx:with
-   (pab (+ n-covariates 2) (n-index n-covariates) 0)
-   (vec:with
-    (v-temp (vec:length eigenvalues) eigenvalues)
-    (vec:scale! v-temp l)
-    (vec:with
-     (hi-eval (vec:length eigenvalues) 1)
-     (vec:add-constant! v-temp 1)
-     (vec:divide! hi-eval v-temp)
-     (calc-pab! uab pab hi-eval n-covariates)
-     (let* ((index-yy (abindex (+ n-covariates 2) (+ n-covariates 2)
-                               n-covariates))
-            (index-xx (abindex (+ n-covariates 1) (+ n-covariates 1)
-                               n-covariates))
-            (index-xy (abindex (+ n-covariates 2) (+ n-covariates 1)
-                               n-covariates))
-            (p-yy (mtx:get pab n-covariates index-yy))
-            (p-xx (mtx:get pab n-covariates index-xx))
-            (p-xy (mtx:get pab n-covariates index-xy))
-            (px-yy (mtx:get pab (1+ n-covariates) index-yy))
-            (df (- n-inds n-covariates 1))
-            (beta (/ p-xy p-xx))
-            (tau (/ df px-yy))
-            ;; GEMMA has safe_sqrt(1.0 / (tau * P_xx));
-            (se (sqrt (abs (/ 1 (* tau p-xx)))))
-            (p-wald (gsl-cdf-fdist-q (* (- p-yy px-yy) tau) 1.0 df))
-            (p-score (gsl-cdf-fdist-q
-                      (/ (* n-inds p-xy p-xy)
-                         (* p-yy p-xx))
-                      1.0
-                      df)))
-       (values beta tau se p-score p-wald))))))
-
 (define (calc-covariate-pheno y w useful-pheno-mtx cvt-mtx useful-individuals)
   "Put USEFUL-PHENO-MTX data into Y and CVT-MTX into W.
 Only include the data for USEFUL-INDIVIDUALS."
@@ -757,16 +722,21 @@ Only include the data for USEFUL-INDIVIDUALS."
 
 ;; This function exists for the sole reason of closing over UAB et
 ;; al. while passing the generated functions to GSL root solvers.
-(define (make-log-functions n-inds n-covariates uab eval)
+(define (make-log-functions calc-null? n-inds n-covariates uab eval)
   "Used to create functions closed over UAB, EVAL etc.
 GEMMA uses FUNC_PARAMS struct and GSL root setters for that, but we
 have closures for that in Scheme."
   (list
-   ;; LogL_dev1
+   ;; LogRL_dev1
    (lambda (l)
-     (let ((nc-total (1+ n-covariates))
+     (let ((nc-total (if calc-null?
+                         n-covariates
+                         (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates 1)))
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1))))
        (vec:with
         (hi-eval (vec:length eval) 1)
         (vec:with
@@ -781,31 +751,111 @@ have closures for that in Scheme."
           (mtx:with
            (pab (2+ n-covariates) n-index)
            (calc-pab! uab pab hi-eval n-covariates)
-           (let* ((trace-hi (blas:dot hi-eval v-temp))
-                  (trace-p trace-hi))
+           (mtx:with
+            (ppab (2+ n-covariates) n-index)
+            (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
+            (let* ((trace-hi (blas:dot hi-eval v-temp))
+                   (trace-p
+                    (do ((i 0 (1+ i))
+                         (trace-p
+                          trace-hi
+                          (let ((index-ww (abindex (1+ i) (1+ i) n-covariates)))
+                            (- trace-p
+                               (/ (mtx:get ppab i index-ww)
+                                  (mtx:get pab i index-ww))))))
+                        ((= i nc-total)
+                         trace-p)))
+                   (trace-pk (/ (- df trace-p) l))
+                   (index-ww (abindex (2+ n-covariates) (2+ n-covariates)
+                                      n-covariates))
+                   (p-yy (mtx:get pab nc-total index-ww))
+                   (pp-yy (mtx:get ppab nc-total index-ww))
+                   (y-pkp-y (/ (- p-yy pp-yy) l)))
+              (real-part
+               (+ (* -1/2 trace-pk)
+                  (/ (* 1/2 df y-pkp-y)
+                     p-yy)))))))))))
+   ;; LogRL_dev2
+   (lambda (l)
+     (let ((nc-total (if calc-null?
+                         n-covariates
+                         (1+ n-covariates)))
+           (n-index (n-index n-covariates))
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
+           (eval-len (vec:length eval)))
+       (vec:with
+        (hi-eval eval-len 1)
+        (vec:with
+         (v-temp eval-len eval)
+         (vec:scale! v-temp l)
+         (vec:add-constant! v-temp 1)
+         (vec:divide! hi-eval v-temp)
+         (vec:with
+          (hi-hi-eval eval-len hi-eval)
+          (vec:multiply! hi-hi-eval hi-eval)
+          (vec:with
+           (hi-hi-hi-eval eval-len hi-hi-eval)
+           (vec:multiply! hi-hi-hi-eval hi-eval)
+           (vec:fill! v-temp 1)
+           (mtx:with
+            (pab (2+ n-covariates) n-index)
+            (calc-pab! uab pab hi-eval n-covariates)
+            (mtx:with
+             (ppab (2+ n-covariates) n-index)
+             (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
              (mtx:with
-              (ppab (2+ n-covariates) n-index)
-              (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
-              (do ((i 0 (1+ i)))
-                  ((= i nc-total))
-                (let ((index-ww (abindex (1+ i) (1+ i) n-covariates)))
-                  (set! trace-p (- trace-p (/ (mtx:get pab i index-ww)
-                                              (mtx:get ppab i index-ww))))))
-              (let* ((trace-pk (/ (- df trace-p) l))
-                     (index-ww (abindex (2+ n-covariates) (2+ n-covariates)
-                                        n-covariates))
+              (pppab (2+ n-covariates) n-index)
+              (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
+              (let* ((trace-hi (blas:dot hi-eval v-temp))
+                     (trace-hi-hi (blas:dot hi-hi-eval v-temp))
+                     (trace-p trace-hi)
+                     (trace-pp trace-hi-hi)
+                     (_ (do ((i 0 (1+ i)))
+                            ((= i nc-total))
+                          (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
+                                 (ps-ww (mtx:get pab i index-ww))
+                                 (ps2-ww (mtx:get ppab i index-ww))
+                                 (ps3-ww (mtx:get pppab i index-ww)))
+                            (set! trace-p (- trace-p (/ ps2-ww ps-ww)))
+                            (set! trace-pp
+                                  (+ trace-pp
+                                     (- (/ (expt ps2-ww 2)
+                                           (expt ps-ww 2))
+                                        (/ (* 2 ps3-ww)
+                                           ps-ww)))))))
+                     (trace-pkpk (/ (+ df
+                                       trace-pp
+                                       (- (* 2 trace-p)))
+                                    (* l l)))
+                     (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
                      (p-yy (mtx:get pab nc-total index-ww))
                      (pp-yy (mtx:get ppab nc-total index-ww))
-                     (y-pkp-y (/ (- p-yy pp-yy) l)))
+                     (ppp-yy (mtx:get pppab nc-total index-ww))
+                     (ypkpy (/ (- p-yy pp-yy) l))
+                     (ypkpkpy (/ (+ pp-yy
+                                    ppp-yy
+                                    (- (* 2 pp-yy)))
+                                 (* l l))))
                 (real-part
-                 (+ (* -0.5 trace-pk)
-                    (/ (* 0.5 df y-pkp-y)
-                       p-yy))))))))))))
-   ;; LogL_dev2
+                 (- (* 1/2 trace-pkpk)
+                    (* 1/2
+                       df
+                       (- (* 2 ypkpkpy p-yy)
+                          (expt ypkpy 2))
+                       (/ 1 (expt p-yy 2)))))))))))))))
+   ;; LogRL_dev12
    (lambda (l)
-     (let ((nc-total (1+ n-covariates))
+     (let ((nc-total (if calc-null?
+                         n-covariates
+                         (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates 1))
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -821,97 +871,67 @@ have closures for that in Scheme."
            (hi-hi-hi-eval eval-len hi-hi-eval)
            (vec:multiply! hi-hi-hi-eval hi-eval)
            (vec:fill! v-temp 1)
-           (let* ((trace-hi (blas:dot hi-eval v-temp))
-                  (trace-hi-hi (blas:dot hi-hi-eval v-temp))
-                  (trace-hik-hik (/ (+ n-inds
-                                       trace-hi-hi
-                                       (- (* 2 trace-hi)))
-                                    (* l l))))
+           (mtx:with
+            (pab (2+ n-covariates) n-index)
+            (calc-pab! uab pab hi-eval n-covariates)
+            (mtx:with
+             (ppab (2+ n-covariates) n-index)
+             (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
              (mtx:with
-              (pab (2+ n-covariates) n-index)
-              (calc-pab! uab pab hi-eval n-covariates)
-              (mtx:with
-               (ppab (2+ n-covariates) n-index)
-               (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
-               (mtx:with
-                (pppab (2+ n-covariates) n-index)
-                (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
-                (let* ((index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
-                       (p-yy (mtx:get pab nc-total index-yy))
-                       (pp-yy (mtx:get ppab nc-total index-yy))
-                       (ppp-yy (mtx:get pppab nc-total index-yy))
-                       (ypkpy (/ (- p-yy pp-yy) l))
-                       (ypkpkpy (/ (+ pp-yy
-                                      ppp-yy
-                                      (- (* 2 pp-yy)))
-                                   (* l l))))
-                  (real-part
-                   (- (* 1/2 trace-hik-hik)
-                      (* 1/2
-                         n-inds
-                         (- (* 2 ypkpkpy p-yy)
-                            (* ypkpy ypkpy))
-                         (/ 1 (* p-yy p-yy))))))))))))))))
-   ;; LogL_dev12
+              (pppab (2+ n-covariates) n-index)
+              (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
+              (let* ((trace-hi (blas:dot hi-eval v-temp))
+                     (trace-hi-hi (blas:dot hi-hi-eval v-temp))
+                     (trace-p trace-hi)
+                     (trace-pp trace-hi-hi)
+                     (_ (do ((i 0 (1+ i)))
+                            ((= i nc-total))
+                          (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
+                                 (ps-ww (mtx:get pab i index-ww))
+                                 (ps2-ww (mtx:get ppab i index-ww))
+                                 (ps3-ww (mtx:get pppab i index-ww)))
+                            (set! trace-p (- trace-p (/ ps2-ww ps-ww)))
+                            (set! trace-pp
+                                  (+ trace-pp
+                                     (- (/ (expt ps2-ww 2)
+                                           (expt ps-ww 2))
+                                        (/ (* 2 ps3-ww)
+                                           ps-ww)))))))
+                     (trace-pk (/ (- df trace-p) l))
+                     (trace-pkpk (/
+                                  (+ df
+                                     trace-pp
+                                     (- (* 2 trace-p)))
+                                  (expt l 2)))
+                     (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+                     (p-yy (mtx:get pab nc-total index-ww))
+                     (pp-yy (mtx:get ppab nc-total index-ww))
+                     (ppp-yy (mtx:get pppab nc-total index-ww))
+                     (ypkpy (/ (- p-yy pp-yy) l))
+                     (ypkpkpy (/ (+ p-yy
+                                    ppp-yy
+                                    (- (* 2 pp-yy)))
+                                 (* l l)))
+                     (dev1 (+ (* -1/2 trace-pk)
+                              (/ (* 1/2 df ypkpy)
+                                 p-yy)))
+                     (dev2 (- (* 1/2 trace-pkpk)
+                              (* 1/2
+                                 df
+                                 (- (* 2 ypkpkpy p-yy)
+                                    (expt ypkpy 2))
+                                 (/ 1 (expt p-yy 2))))))
+                (values (real-part dev1) (real-part dev2))))))))))))
+   ;; LogRL_f
    (lambda (l)
-     (let ((nc-total (1+ n-covariates))
+     (let ((nc-total (if calc-null?
+                         n-covariates
+                         (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates 1))
-           (eval-len (vec:length eval)))
-       (vec:with
-        (hi-eval eval-len 1)
-        (vec:with
-         (v-temp eval-len eval)
-         (vec:scale! v-temp l)
-         (vec:add-constant! v-temp 1)
-         (vec:divide! hi-eval v-temp)
-         (vec:with
-          (hi-hi-eval eval-len hi-eval)
-          (vec:multiply! hi-hi-eval hi-eval)
-          (vec:with
-           (hi-hi-hi-eval eval-len hi-hi-eval)
-           (vec:multiply! hi-hi-hi-eval hi-eval)
-           (vec:fill! v-temp 1)
-           (let* ((trace-hi (blas:dot hi-eval v-temp))
-                  (trace-hi-hi (blas:dot hi-hi-eval v-temp))
-                  (trace-hik (/ (- n-inds trace-hi) l))
-                  (trace-hik-hik (/ (+ n-inds
-                                       trace-hi-hi
-                                       (- (* 2 trace-hi)))
-                                    (* l l))))
-             (mtx:with
-              (pab (2+ n-covariates) n-index)
-              (calc-pab! uab pab hi-eval n-covariates)
-              (mtx:with
-               (ppab (2+ n-covariates) n-index)
-               (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
-               (mtx:with
-                (pppab (2+ n-covariates) n-index)
-                (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
-                (let* ((index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
-                       (p-yy (mtx:get pab nc-total index-yy))
-                       (pp-yy (mtx:get ppab nc-total index-yy))
-                       (ppp-yy (mtx:get pppab nc-total index-yy))
-                       (ypkpy (/ (- p-yy p-yy) l))
-                       (ypkpkpy (/ (+ p-yy
-                                      pp-yy
-                                      (- (* 2 pp-yy)))
-                                   (* l l)))
-                       (dev1 (+ (* -1/2 trace-hik)
-                                (/ (* 1/2 df ypkpy)
-                                   p-yy)))
-                       (dev2 (- (* 1/2 trace-hik-hik)
-                                (* 1/2
-                                   n-inds
-                                   (- (* 2 ypkpkpy p-yy)
-                                      (* ypkpy ypkpy))
-                                   (/ 1 (* p-yy p-yy))))))
-                  (values (real-part dev1) (real-part dev2)))))))))))))
-   ;; LogL_f
-   (lambda (l)
-     (let ((nc-total (1+ n-covariates))
-           (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates 1))
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -923,31 +943,46 @@ have closures for that in Scheme."
          (mtx:with
           (pab (2+ n-covariates) n-index)
           (calc-pab! uab pab hi-eval n-covariates)
-          (let* ((lodget-h
-                  (do ((i 0 (1+ i))
-                       (logdet-h (log (abs (vec:get v-temp 0)))
-                                 (+ logdet-h
-                                    (log (abs (vec:get v-temp i))))))
-                      ((= i eval-len)
-                       logdet-h)))
-                 (c (* 1/2
-                       n-inds
-                       (- (log n-inds)
-                          (log (* 2 +pi+))
-                          1)))
-                 (index-yy (abindex (2+ n-covariates) (2+ n-covariates)
-                                    n-covariates))
-                 (p-yy (mtx:get pab nc-total index-yy))
-                 (result (- c
-                            (/ lodget-h 2)
-                            (* 1/2 n-inds (log p-yy)))))
-            (real-part result)))))))))
+          (mtx:with
+           (iab (2+ n-covariates) n-index)
+           (vec:fill! v-temp 1.0)
+           (calc-pab! uab iab v-temp n-covariates)
+           (let* ((logdet-h
+                   (do ((i 0 (1+ i))
+                        (logdet-h 0
+                                  (+ logdet-h
+                                     (log (abs (vec:get v-temp i))))))
+                       ((= i eval-len)
+                        logdet-h)))
+                  (logdet-hiw (do ((i 0 (1+ i))
+                                   (logdet-hiw
+                                    0
+                                    (let ((index-ww (abindex (1+ i) (1+ i) n-covariates)))
+                                      (+ logdet-hiw
+                                         (log (mtx:get pab i index-ww))
+                                         (- (log (mtx:get iab i index-ww)))))))
+                                  ((= i nc-total)
+                                   logdet-hiw)))
+                  (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+                  (p-yy (mtx:get pab nc-total index-ww))
+                  (c (* 1/2
+                        df
+                        (- (log df)
+                           (log (* 2 +pi+))
+                           1)))
+                  (index-yy (abindex (2+ n-covariates) (2+ n-covariates)
+                                     n-covariates))
+                  (result (- c
+                             (/ logdet-h 2)
+                             (/ logdet-hiw 2)
+                             (* 1/2 df (log p-yy)))))
+             (real-part result))))))))))
 
-(define (calc-lambda n-inds n-covariates uab eval)
+(define (calc-lambda calc-null? n-inds n-covariates uab eval)
   "Calculate lambda for alternative model (UAB from `calc-uab-alt!')
 Return (LAMBDA LOGF) values."
-  (match (make-log-functions n-inds n-covariates uab eval)
-    ((log-l-dev1 log-l-dev2 log-l-dev12 log-l-f)
+  (match (make-log-functions calc-null? n-inds n-covariates uab eval)
+    ((log-rl-dev1 log-rl-dev2 log-rl-dev12 log-rl-f)
      (let* ((lambda-interval (/ (log (/ (l-max) (l-min))) (n-regions)))
             (sign-changes
              (remove (cut not <>)
@@ -955,15 +990,15 @@ Return (LAMBDA LOGF) values."
                              (lambda (i)
                                (let* ((lambda-l (* (l-min) (exp (* lambda-interval i))))
                                       (lambda-h (* (l-min) (exp (* lambda-interval (1+ i)))))
-                                      (dev1-l (log-l-dev1 lambda-l))
-                                      (dev1-h (log-l-dev1 lambda-h)))
+                                      (dev1-l (log-rl-dev1 lambda-l))
+                                      (dev1-h (log-rl-dev1 lambda-h)))
                                  (if (<= (* dev1-l dev1-h) 0)
                                      (list lambda-l lambda-h)
                                      #f)))
                              1+ 0))))
        (if (null? sign-changes)
-           (let ((logf-l (log-l-f (l-min)))
-                 (logf-h (log-l-f (l-max))))
+           (let ((logf-l (log-rl-f (l-min)))
+                 (logf-h (log-rl-f (l-max))))
              (if (>= logf-l logf-h)
                  (values (l-min) logf-l)
                  (values (l-max) logf-h)))
@@ -996,9 +1031,9 @@ Return (LAMBDA LOGF) values."
                                   (old-root (root:root solver))
                                   (root (or (root:optimize
                                              root:+newton-polisher+ 100 1e-5
-                                             #:function log-l-dev1
-                                             #:derivative log-l-dev2
-                                             #:function+derivative log-l-dev12
+                                             #:function log-rl-dev1
+                                             #:derivative log-rl-dev2
+                                             #:function+derivative log-rl-dev12
                                              #:approximate-root old-root)
                                             old-root))
                                   (_ (gsl:set-error-handler! handler)))
@@ -1006,7 +1041,7 @@ Return (LAMBDA LOGF) values."
                                  (let* ((l (min (max root
                                                      (l-min))
                                                 (l-max)))
-                                        (logf-l (log-l-f l)))
+                                        (logf-l (log-rl-f l)))
                                    (cond
                                     ((and (nan? lam)
                                           (nan? logf))
@@ -1017,7 +1052,7 @@ Return (LAMBDA LOGF) values."
                                      (rec (cdr sign-changes) lam logf))))
                                  (rec (cdr sign-changes) lam logf)))
                            (rec (cdr sign-changes) lam logf)))
-                     #:function log-l-dev1
+                     #:function log-rl-dev1
                      #:upper lambda-h
                      #:lower lambda-l))))))))))))
 
@@ -1108,9 +1143,36 @@ Return a new matrix with cleaned-up ones."
       (lambda ()
         #t)
       (lambda ()
-        (calc-lambda n-inds n-covariates uab eval))
+        (calc-lambda #t n-inds n-covariates uab eval))
       (lambda ()
         (mtx:free uab)))))
+
+(define (calc-rlwald l n-inds n-covariates uab eval)
+  (let ((n-index (n-index n-covariates))
+        (df (- n-inds n-covariates 1))
+        (eval-len (vec:length eval)))
+    (vec:with
+     (hi-eval eval-len 1)
+     (vec:with
+      (v-temp eval-len eval)
+      (vec:scale! v-temp l)
+      (vec:add-constant! v-temp 1)
+      (vec:divide! hi-eval v-temp)
+      (mtx:with
+       (pab (2+ n-covariates) n-index)
+       (calc-pab! uab pab hi-eval n-covariates)
+       (let* ((index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+              (index-xx (abindex (1+ n-covariates) (1+ n-covariates) n-covariates))
+              (index-xy (abindex (2+ n-covariates) (1+ n-covariates) n-covariates))
+              (p-yy (mtx:get pab n-covariates index-yy))
+              (p-xx (mtx:get pab n-covariates index-xx))
+              (p-xy (mtx:get pab n-covariates index-xy))
+              (px-yy (mtx:get pab (1+ n-covariates) index-yy))
+              (beta (/ p-xy p-xx))
+              (tau (/ df px-yy))
+              (se (abs (/ 1 (* tau p-xx))))
+              (p-wald (gsl-cdf-fdist-q (* tau (- p-yy px-yy)) 1 df)))
+         (values beta se p-wald)))))))
 
 (define (analyze geno markers kinship eigenvectors pheno cvt)
   "Return the per-snp params for MARKERS in GENO.
@@ -1166,25 +1228,18 @@ EIGENVECTORS are computed from KINSHIP when #f."
              ((= i n-markers))
            (mtx:column->vec! utx i tmp)
            (calc-uab-alt! utw uty-col tmp uab n-covariates)
-           (receive (beta tau se p-score p-wald)
-               (rlscore (l-mle-null) n-covariates n-useful-inds eval uab)
-             (receive (lam logl-alt)
-                 (calc-lambda n-useful-inds n-covariates uab eval)
-               (let ((p-ltr (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null)))
-                                             1)))
-                 (hash-set! per-snp-params (car markers)
-                            (list
-                             ;; Maf
-                             (hash-ref useful-snps (car markers))
-                             beta se
-                             1e-5 ;; lambda-remle default
-                             lam
-                             ;; p-wald is calculated in rlscore,
-                             ;; although GEMMA has a separate function
-                             ;; for it. Otherwise I was unable to find
-                             ;; where it comes from -- aartaka
-                             p-wald
-                             p-ltr p-score logl-alt)))))))))
+           (receive (lam logl-alt)
+               (calc-lambda #f n-useful-inds n-covariates uab eval)
+             (receive (beta se p-wald)
+                 (calc-rlwald lam n-useful-inds n-covariates uab eval)
+               (hash-set! per-snp-params (car markers)
+                          (list
+                           ;; Maf
+                           (hash-ref useful-snps (car markers))
+                           beta se
+                           lam
+                           p-wald
+                           logl-alt))))))))
     per-snp-params))
 
 (define (snp-params->assoc.txt params-table assoc.txt)
@@ -1198,9 +1253,8 @@ EIGENVECTORS are computed from KINSHIP when #f."
            ((maf
              beta se
              lambda-remle
-             lambda
              p-wald
-             p-ltr p-score logl-alt)
+             logl-alt)
             (format p "~a\t ~s\t ~s\t ~s\t ~s\t ~s\t ~s~%"
                     key     maf  beta se   logl-alt lambda-remle p-wald))))
        params-table))))
