@@ -992,6 +992,7 @@ Return (LAMBDA LOGF) values."
                                       (lambda-h (* (l-min) (exp (* lambda-interval (1+ i)))))
                                       (dev1-l (log-rl-dev1 lambda-l))
                                       (dev1-h (log-rl-dev1 lambda-h)))
+                                 ;; If sign flips b/w dev1-l & dev1-h
                                  (if (<= (* dev1-l dev1-h) 0)
                                      (list lambda-l lambda-h)
                                      #f)))
