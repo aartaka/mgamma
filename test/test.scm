@@ -85,10 +85,6 @@
 ((@@ (mgamma core) kinship->lmdb)
  kin
  "/tmp/mgamma-kin")
-;; Can't compare with mtx:equal?, because LMDB storage format looses
-;; precision due to float storage.
-(define-syntax-rule (test-approx a b)
-  (test-assert (< (abs (- a b)) 1e-5)))
 
 (define lmdb-kin ((@@ (mgamma core) lmdb->kinship)
                   "/tmp/mgamma-kin/"))
