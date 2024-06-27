@@ -58,8 +58,15 @@
                   guile-gsl-git
                   guile-lapack-git))
     (home-page "https://github.com/aartaka/guile-gemma")
-    (synopsis "")
-    (description "")
+    (synopsis "Mgamma is a tool for Genome-Wide Association Studies (GWAS).")
+    (description "This package provides a Guile @code{(mgamma core)} module and a
+@code{mgamma} CLI tool. Supported use-cases and commands are:
+@itemize
+@item @code{convert} to convert between multiple data formats and
+Mgamma-specific LMDB-based format.
+@item @code{kinship} to compute kinship matrix for given genetic data.
+@item @code{gwa} to compute LMM (Linear Mixed Model) parameters based
+on kinship matrix and genotypes.  @end itemize")
     (license license:gpl3+)))
 
 mgamma-git
