@@ -85,16 +85,6 @@ kinship lmdb -> txt     [--map-size 10000000] --kinship data.mdb --output kinshi
   (unless (option-ref options 'help #f)
     (ensure-options options 'output))
   (let* ((help (option-ref options 'help #f))
-         (geno (if help
-                   #f
-                   (or (option-ref options 'geno #f)
-                       "geno.mdb")))
-         (geno-txt? (when geno
-                      (txt-file? geno)))
-         (pheno (if help
-                    #f
-                    (or (option-ref options 'pheno #f)
-                        "pheno.txt")))
          (output (option-ref options 'output #f))
          (mdb-out? (and output (mdb-file? output)))
          (txt-out? (and output (txt-file? output))))
@@ -106,19 +96,24 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
           (mapsize (suffixed-string->number map-size))))
-      (match (if geno-txt?
-                 (geno.txt->genotypes-mtx geno)
-                 (lmdb->genotypes-mtx (dirname geno)))
-        ((geno-mtx markers)
-         (let* ((useful-snps (useful-snps geno-mtx markers (pheno.txt->pheno-mtx (option-ref options 'pheno #f))
-                                          #f ;; Covariate matrix, empty for now
-                                          #:maf-level (or (string->number (option-ref options 'maf ""))
-                                                          0.01)))
-                (_ (cleanup-mtx geno-mtx))
-                (kin-mtx (kinship-mtx geno-mtx markers useful-snps)))
-           (if txt-out?
-               (kinship->cxx.txt kin-mtx output)
-               (kinship->lmdb kin-mtx (dirname output))))))))
+      (let ((geno (or (option-ref options 'geno #f)
+                      "geno.mdb"))
+            (geno-txt? (txt-file? geno))
+            (pheno (or (option-ref options 'pheno #f)
+                       "pheno.txt")))
+        (match (if geno-txt?
+                   (geno.txt->genotypes-mtx geno)
+                   (lmdb->genotypes-mtx (dirname geno)))
+          ((geno-mtx markers)
+           (let* ((useful-snps (useful-snps geno-mtx markers (pheno.txt->pheno-mtx (option-ref options 'pheno #f))
+                                            #f ;; Covariate matrix, empty for now
+                                            #:maf-level (or (string->number (option-ref options 'maf ""))
+                                                            0.01)))
+                  (_ (cleanup-mtx geno-mtx))
+                  (kin-mtx (kinship-mtx geno-mtx markers useful-snps)))
+             (if txt-out?
+                 (kinship->cxx.txt kin-mtx output)
+                 (kinship->lmdb kin-mtx (dirname output)))))))))
     (when (and mdb-out?
                (not help))
       (rename-file (string-append (dirname output) "/data.mdb")
@@ -128,20 +123,6 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
   (unless (option-ref options 'help #f)
     (ensure-options options 'output 'geno 'pheno))
   (let* ((help (option-ref options 'help #f))
-         (geno (if help
-                   #f
-                   (or (option-ref options 'geno #f)
-                       "geno.mdb")))
-         (geno-txt? (and geno (txt-file? geno)))
-         (pheno (if help
-                    #f
-                    (or (option-ref options 'pheno #f)
-                        "pheno.txt")))
-         (kin (if help
-                  #f
-                  (or (option-ref options 'kinship #f)
-                      "kinship.mdb")))
-         (kin-txt? (and kin (txt-file? kin)))
          (output (option-ref options 'output #f)))
     (cond
      (help
@@ -151,21 +132,29 @@ mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(lmdb
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
           (mapsize (suffixed-string->number map-size))))
-      (match (if geno-txt?
-                 (geno.txt->genotypes-mtx geno)
-                 (lmdb->genotypes-mtx (dirname geno)))
-        ((geno-mtx markers)
-         (let* ((pheno-mtx (pheno.txt->pheno-mtx (option-ref options 'pheno #f)))
-                (cvt-mtx (if (option-ref options 'covar #f)
-                             (covariates.txt->cvt-mtx (option-ref options 'covar #f))
-                             #f)))
-           (snp-params->assoc.txt
-            (analyze geno-mtx markers (cond
-                                       (kin-txt? (cxx.txt->kinship kin))
-                                       (kin (lmdb->kinship (dirname kin)))
-                                       (else #f)) #f
-                                       pheno-mtx cvt-mtx)
-            (option-ref options 'output #f)))))))))
+      (let ((geno (or (option-ref options 'geno #f)
+                      "geno.mdb"))
+            (geno-txt? (and geno (txt-file? geno)))
+            (pheno (or (option-ref options 'pheno #f)
+                       "pheno.txt"))
+            (kin (or (option-ref options 'kinship #f)
+                     "kinship.mdb"))
+            (kin-txt? (and kin (txt-file? kin))))
+        (match (if geno-txt?
+                   (geno.txt->genotypes-mtx geno)
+                   (lmdb->genotypes-mtx (dirname geno)))
+          ((geno-mtx markers)
+           (let* ((pheno-mtx (pheno.txt->pheno-mtx (option-ref options 'pheno #f)))
+                  (cvt-mtx (if (option-ref options 'covar #f)
+                               (covariates.txt->cvt-mtx (option-ref options 'covar #f))
+                               #f)))
+             (snp-params->assoc.txt
+              (analyze geno-mtx markers (cond
+                                         (kin-txt? (cxx.txt->kinship kin))
+                                         (kin (lmdb->kinship (dirname kin)))
+                                         (else #f)) #f
+                                         pheno-mtx cvt-mtx)
+              (option-ref options 'output #f))))))))))
 
 (define (main args)
   (let* ((command (if (> (length args) 1)
