@@ -94,7 +94,9 @@ Return a list of strings in between these separators."
 (define %read-separated-lines-cache (make-hash-table))
 (define (read-separated-lines file)
   "Read tab/space/comma-separated fields from FILE.
-Return a list of lists of values."
+Return a list of lists of values.
+Necessary because the biological data often comes in BIMBAM format, a
+frivolous mix of tab and comma separated values."
   (if (hash-ref %read-separated-lines-cache file)
       (hash-ref %read-separated-lines-cache file)
       (begin
@@ -139,7 +141,11 @@ Return a list of lists of values."
   "Convert GENO.TXT-FILE to an LMDB-DIR-located database.
 Useful to speed up genotype matrix manipulation.
 The keys of the resulting DB are marker names.
-The values are `double' arrays with one value per individual."
+The values are `float' arrays (converted to `double' matrices when
+read back into Scheme) with one value per individual.
+DB also contains a \"meta\" record specifying the \"type\",
+\"version\", and whether the data if \"float\", as serialized JSON
+object."
   (let ((lines (read-separated-lines geno.txt-file))
         (float-size (sizeof float)))
     (unless (file-exists? (string-append lmdb-dir "data.mdb"))
@@ -170,6 +176,7 @@ The values are `double' arrays with one value per individual."
 ;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
 (define (vec-mean vec)
+  "Mean value of the VEC, with all the NaNs ignored."
   (let ((sum 0)
         (nans 0))
     (vec:for-vec
@@ -194,6 +201,9 @@ The values are `double' arrays with one value per individual."
   (string= "NA" str))
 
 (define (useful-individuals pheno-mtx cvt-mtx)
+  "Return a list of booleans marking individuals in PHENO-MTX.
+#t is useful/indicator individuals.
+#f is individuals with incomplete data and otherwise not useful."
   (let* ((inds (do ((ind 0 (1+ ind))
                     (inds '()
                           (cons (not (nan? (mtx:get pheno-mtx ind 0)))
@@ -210,6 +220,10 @@ The values are `double' arrays with one value per individual."
     inds))
 
 (define* (useful-snps genotypes-mtx markers pheno-mtx covariates-mtx #:key (miss-level 0.05) (maf-level 0.01))
+  "Return a hash-table from SNP names to MAF values.
+Only includes the useful/indicator SNPs.
+Filter the SNPs for MAF being in (MAF-LEVEL, 1 - MAF-LEVEL) range and
+having less than MISS-LEVEL missing values."
   (let* ((useful-inds (useful-individuals pheno-mtx covariates-mtx))
          (ind-count (length useful-inds))
          (useful-snp-table (make-hash-table))
@@ -250,7 +264,9 @@ The values are `double' arrays with one value per individual."
                 (pointer->bytevector ptr2 size)))
 
 (define* (lmdb->genotypes-mtx lmdb-dir)
-  "Read the data from LMDB-DIR and convert it to GSL matrix."
+  "Read the data from LMDB-DIR and convert it to GSL matrix.
+Useful because LMDB-DIR-resident data often comes as floats, not
+doubles."
   (let* ((mtx #f)
          (tmp-vec #f)
          (line-idx 0)
@@ -310,7 +326,7 @@ Return a (MATRIX MARKER-NAMES) list."
     (list mtx (map first lines))))
 
 (define (cleanup-mtx mtx)
-  "Plug mean instead of NaNs, whenever possible.
+  "Plug mean value instead of NaNs, whenever possible.
 Also subtract mean from all the values to 'center' them."
   (do ((mtx-rows (mtx:rows mtx))
        (mtx-cols (mtx:columns mtx))
@@ -340,7 +356,8 @@ Also subtract mean from all the values to 'center' them."
            (mtx:set! mtx row col (- (mtx:get mtx row col) mean))))))))
 
 (define (kinship-mtx geno-mtx markers useful-snps)
-  "Calculate the kinship matrix for genotype MTX."
+  "Calculate the kinship matrix for GENO-MTX.
+Only calculate if for USEFUL-SNPS out of MARKERS."
   (let* ((n-useful-snps (hash-count (lambda (k v) #t) useful-snps))
          ;; Because we need to sort the useful SNPs into their own matrix.
          (intermediate-mtx (mtx:alloc n-useful-snps (mtx:columns geno-mtx)))
@@ -362,6 +379,7 @@ Also subtract mean from all the values to 'center' them."
       result)))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
+  "Dump KINSHIP-MTX to an LMDB residing in LMDB-DIR."
   (let ((env (mdb:env-create #:mapsize (mapsize)))
         (float-size (sizeof float))
         (uint-size (sizeof unsigned-int))
@@ -400,6 +418,7 @@ Also subtract mean from all the values to 'center' them."
         (mdb:txn-commit txn)))))
 
 (define (lmdb->kinship lmdb-dir)
+  "Read kinship matrix from LMDB-DIR."
   (let ((mtx #f))
     (mdb:with-wrapped-cursor
      (lmdb-dir #f #:mapsize (mapsize))
@@ -429,6 +448,7 @@ Also subtract mean from all the values to 'center' them."
     mtx))
 
 (define (kinship->cxx.txt kinship-mtx cxx.txt)
+  "Dump KINSHIP-MTX to CXX.TXT file."
   (let ((last-row 0))
     (call-with-port (open-output-file cxx.txt)
       (lambda (port)
@@ -441,6 +461,8 @@ Also subtract mean from all the values to 'center' them."
          kinship-mtx)))))
 
 (define (txt->mtx file.txt)
+  "Generic text-to-matrix reading.
+Return a `mtx:mtx?' of doubles/f64."
   (let* ((lines (read-separated-lines file.txt))
          (lines-len (length lines))
          (line-len (length (first lines)))
@@ -464,6 +486,7 @@ Also subtract mean from all the values to 'center' them."
   (txt->mtx covariates.txt))
 
 (define (eigenu.txt->eigenvectors eigenu.txt)
+  "Read eigenU (matrix of eigenvectors) from the EIGENU.TXT file."
   (txt->mtx eigenu.txt))
 
 (define (2+ number)
@@ -611,6 +634,7 @@ Also subtract mean from all the values to 'center' them."
       1/2)))
 
 (define (calc-uab-null utw uty)
+  "Calculate UAB for null/H0 model."
   (let* ((n-inds (mtx:rows utw))
          (n-covariates (mtx:columns utw))
          (uab (mtx:alloc n-inds (n-index n-covariates)))
@@ -638,7 +662,7 @@ Also subtract mean from all the values to 'center' them."
 
 ;; uab is reused/modified from the result of calc-uab-null
 (define (calc-uab-alt! utw uty-col utx-col uab n-covariates)
-  "Calculate Uab for alternative model?"
+  "Calculate Uab for alternative model."
   (let* ((n-inds (mtx:rows utw))
          (tmp (vec:alloc (mtx:rows uab))))
     (do ((b 1 (1+ b)))
@@ -657,7 +681,10 @@ Also subtract mean from all the values to 'center' them."
     uab))
 
 (define (eigendecomposition-zeroed kinship)
-  "Eigendecomposition, but zero the values below threshold."
+  "Eigendecomposition, but zero the values below threshold.
+Return two values:
+- EVALUES-VEC
+- EVECTORS-MTX"
   (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
     (lapack:dsyevr
@@ -979,7 +1006,7 @@ have closures for that in Scheme."
              (real-part result))))))))))
 
 (define (calc-lambda calc-null? n-inds n-covariates uab eval)
-  "Calculate lambda for alternative model (UAB from `calc-uab-alt!')
+  "Calculate lambda for null (when CALC-NULL?) or alternative model (UAB from `calc-uab-alt!')
 Return (LAMBDA LOGF) values."
   (match (make-log-functions calc-null? n-inds n-covariates uab eval)
     ((log-rl-dev1 log-rl-dev2 log-rl-dev12 log-rl-f)
@@ -1149,6 +1176,7 @@ Return a new matrix with cleaned-up ones."
         (mtx:free uab)))))
 
 (define (calc-rlwald l n-inds n-covariates uab eval)
+  "Calculate (BETA SE P-WALD) for a given UAB and Lambda."
   (let ((n-index (n-index n-covariates))
         (df (- n-inds n-covariates 1))
         (eval-len (vec:length eval)))
@@ -1177,9 +1205,8 @@ Return a new matrix with cleaned-up ones."
 
 (define (analyze geno markers kinship eigenvectors pheno cvt)
   "Return the per-snp params for MARKERS in GENO.
-Use KINSHIP (optional, might be #f), EIGENVECTORS, PHENO, and CVT (all
-matrices) for computations, but mostly clean them up into new ones and
-use those.
+Use KINSHIP, EIGENVECTORS , PHENO, and CVT (all matrices) for
+computations, but mostly clean them up into new ones and use those.
 KINSHIP is computed from GENO when #f.
 EIGENVECTORS are computed from KINSHIP when #f."
   (let* ((useful-individuals (useful-individuals pheno cvt))
