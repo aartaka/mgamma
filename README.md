@@ -27,7 +27,7 @@ mgamma convert -g genofile -a annofile [--map-size 10M] -o geno.mdb
 Use this to compute the kinship matrix
 
 ```
-mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.lmdb -p pheno.txt -o kinship.mdb
+mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.mdb -p pheno.txt -o kinship.mdb
 ```
 
 To compute the LMM we use
@@ -52,8 +52,8 @@ should compute the same kinship.mdb and assoc.txt files from default geno/pheno 
 In the near future we'll support LOCO to compute kinship and SNPs by default. To skip LOCO use:
 
 ```
-mgamma kinship -g geno.lmdb -o kinship.lmdb --no-loco
-mgamma gwa -g geno.lmdb -p pheno.txt -k kinship.lmdb -o gwa.lmdb
+mgamma kinship -g geno.mdb -o kinship.mdb --no-loco
+mgamma gwa -g geno.mdb -p pheno.txt -k kinship.mdb -o gwa.mdb
 ```
 
 will compute the matrix without LOCO because it is missing in the kinship file.
@@ -63,7 +63,7 @@ will compute the matrix without LOCO because it is missing in the kinship file.
 To add covariates run the LMM command with a covariate file
 
 ```
-mgamma gwa -g geno.lmdb -p pheno.txt -c covariates.txt -k kinship.lmdb
+mgamma gwa -g geno.mdb -p pheno.txt -c covariates.txt -k kinship.lmdb
 ```
 
 ## Extras
@@ -71,5 +71,5 @@ mgamma gwa -g geno.lmdb -p pheno.txt -c covariates.txt -k kinship.lmdb
 Convert a kinship file to its (old) tab delimited information
 
 ```
-mgamma convert -k kinship.lmdb -o kinship.out
+mgamma convert -k kinship.mdb -o kinship.out
 ```
