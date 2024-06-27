@@ -41,11 +41,11 @@ mgamma gwa -g geno.mdb -p pheno.txt [--map-size 10M] -k kinship.mdb -o assoc.txt
 TODO: When no file names are given we default to above names, so:
 
 ```
-mgamma kinship
-mgamma gwa
+mgamma kinship -o kinship.mdb
+mgamma gwa -o assoc.txt
 ```
 
-should compute the same kinship.lmdb and assoc.txt files.
+should compute the same kinship.mdb and assoc.txt files from default geno/pheno files.
 
 ## LOCO
 
