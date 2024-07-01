@@ -8,7 +8,7 @@ IMPORTANT: WIP. YMMV.
 # Usage
 
 Get help and example usage:
-```
+``` sh
 mgamma
 mgamma help
 mgamma -h
@@ -20,19 +20,19 @@ mgamma gwa --help
 
 Convert a textual genotype file to mgamma lmdb format
 
-```
+``` sh
 mgamma convert -g genofile -a annofile [--map-size 10M] -o geno.mdb
 ```
 
 Use this to compute the kinship matrix
 
-```
+``` sh
 mgamma kinship [--maf 0.1] [--map-size 10M] -g geno.mdb -p pheno.txt -o kinship.mdb
 ```
 
 To compute the LMM we use
 
-```
+``` sh
 mgamma gwa -g geno.mdb -p pheno.txt [--map-size 10M] -k kinship.mdb -o assoc.txt
 ```
 
@@ -40,7 +40,7 @@ mgamma gwa -g geno.mdb -p pheno.txt [--map-size 10M] -k kinship.mdb -o assoc.txt
 
 TODO: When no file names are given we default to above names, so:
 
-```
+``` sh
 mgamma kinship -o kinship.mdb
 mgamma gwa -o assoc.txt
 ```
