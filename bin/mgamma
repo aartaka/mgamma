@@ -104,7 +104,7 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
         (match (if geno-txt?
                    (geno.txt->genotypes-mtx geno)
                    (lmdb->genotypes-mtx (dirname geno)))
-          ((geno-mtx markers)
+          ((geno-mtx markers . rest)
            (let* ((useful-snps (useful-snps geno-mtx markers (pheno.txt->pheno-mtx (option-ref options 'pheno #f))
                                             #f ;; Covariate matrix, empty for now
                                             #:maf-level (or (string->number (option-ref options 'maf ""))
