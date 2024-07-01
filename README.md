@@ -47,6 +47,33 @@ mgamma gwa -o assoc.txt
 
 should compute the same kinship.mdb and assoc.txt files from default geno/pheno files.
 
+## Example session
+
+Using shell to get LMM params for given geno/pheno.
+
+``` sh
+# Convert geno to Mgamma LMDB-based format.
+mgamma convert -g /path/to/mgamma/example/BXD_geno.txt -o /tmp/mgamma-geno/data.mdb
+# Compute kinship matrix from geno&pheno.
+mgamma kinship -g /tmp/mgamma-geno/data.mdb -p /path/to/mgamma/example/BXD_pheno.txt
+# Compute LMM params from geno, pheno, and kinship.
+mgamma gwa -g /tmp/mgamma-geno/data.mdb -p /path/to/mgamma/example/BXD_pheno.txt -k /tmp/mgamma-kin/data.mdb -o BXD.assoc.txt
+```
+
+or, in Scheme REPL (more verbose, but allows playing with data interactively).
+
+``` scheme
+(use-modules ((mgamma core) #:prefix mgamma:))
+(use-modules (srfi srfi-1))
+(define geno+markers (mgamma:geno.txt->lmdb "/path/to/mgamma/example/BXD_geno.txt" "/tmp/mgamma-geno/"))
+(define geno-mtx (first geno+markers))
+(define markers (second geno+markers))
+(define pheno-mtx (pheno.txt->pheno-mtx "/path/to/mgamma/example/BXD_pheno.txt"))
+(define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
+(define params (analyze geno-mtx geno-markers kinship #f pheno-mtx #f))
+(snp-params->assoc.txt params "BXD.assoc.txt")
+```
+
 ## LOCO
 
 In the near future we'll support LOCO to compute kinship and SNPs by default. To skip LOCO use:
