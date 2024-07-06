@@ -33,6 +33,7 @@
             cxx.txt->kinship
             pheno.txt->pheno-mtx
             covariates.txt->cvt-mtx
+            eigenu.txt->eigenvectors
             useful-snps
             useful-individuals
             cleanup-mtx
