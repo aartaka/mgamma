@@ -104,8 +104,8 @@
 ;; Can't compare with mtx:equal? again.
 (define lmdb-geno-mtx (first lmdb-geno))
 (test-approximate (mtx:get geno-mtx 0 0) (mtx:get lmdb-geno-mtx 0 0) 1e-5)
-(test-approximate (mtx:get geno-mtx 3 3) (mtx:get lmdb-geno-mtx 3 3) 1e-5)
-(test-approximate (mtx:get geno-mtx 6 6) (mtx:get lmdb-geno-mtx 6 6) 1e-5)
+(test-approximate (mtx:get geno-mtx 2 3) (mtx:get lmdb-geno-mtx 2 3) 1e-5)
+(test-approximate (mtx:get geno-mtx 2 6) (mtx:get lmdb-geno-mtx 2 6) 1e-5)
 (test-equal 3 (length (second lmdb-geno)))
 (test-end "import-export")
 
