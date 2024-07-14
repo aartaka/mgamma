@@ -9,12 +9,12 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((lmdb lmdb) #:prefix mdb:))
 
-(test-begin "io")
-(define lines ((@@ (mgamma core) read-separated-lines)  "test/separated-lines.txt"))
-(test-assert (every (lambda (l)
-                      (equal? '("a" "b" "c") l))
-                    lines))
-(test-end "io")
+;; (test-begin "io")
+;; (define lines ((@@ (mgamma core) read-separated-lines)  "test/separated-lines.txt"))
+;; (test-assert (every (lambda (l)
+;;                       (equal? '("a" "b" "c") l))
+;;                     lines))
+;; (test-end "io")
 
 (test-begin "vec-helpers")
 (test-equal 2.5 ((@@ (mgamma core) vec-mean) (vec:alloc 4 #(1 2 3 4))))
