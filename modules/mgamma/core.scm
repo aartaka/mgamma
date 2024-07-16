@@ -19,7 +19,7 @@
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (json)
   #:export (kinship-mtx
-            analyze))
+            lmm-analyze))
 
 (gsl:set-error-handler
  (lambda* (#:optional (reason "unknown reason") (file "unknown-file") (line -1) (errno -1) #:rest rest)
@@ -645,7 +645,7 @@ Return (LAMBDA LOGF) values."
               (p-wald (gsl-cdf-fdist-q (* tau (- p-yy px-yy)) 1 df)))
          (values beta se p-wald)))))))
 
-(define (analyze geno markers kinship eigenvectors pheno cvt)
+(define (lmm-analyze geno markers kinship eigenvectors pheno cvt)
   "Return the per-snp params for MARKERS in GENO.
 Use KINSHIP, EIGENVECTORS , PHENO, and CVT (all matrices) for
 computations, but mostly clean them up into new ones and use those.

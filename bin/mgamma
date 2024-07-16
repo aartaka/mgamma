@@ -153,11 +153,11 @@ mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(lmdb
                                (covariates.txt->cvt-mtx (option-ref options 'covar #f))
                                #f)))
              (snp-params->assoc.txt
-              (analyze geno-mtx markers (cond
-                                         (kin-txt? (cxx.txt->kinship kin))
-                                         (kin (lmdb->kinship (dirname kin)))
-                                         (else #f)) #f
-                                         pheno-mtx cvt-mtx)
+              (lmm-analyze geno-mtx markers (cond
+                                             (kin-txt? (cxx.txt->kinship kin))
+                                             (kin (lmdb->kinship (dirname kin)))
+                                             (else #f)) #f
+                                             pheno-mtx cvt-mtx)
               (option-ref options 'output #f))))))))))
 
 (define (main args)
