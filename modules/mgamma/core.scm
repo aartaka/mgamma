@@ -19,7 +19,6 @@
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (json)
   #:export (kinship-mtx
-            cleanup-mtx
             analyze))
 
 (gsl:set-error-handler
