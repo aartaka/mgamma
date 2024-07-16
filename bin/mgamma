@@ -5,6 +5,7 @@
 (use-modules (mgamma config))
 (use-modules (mgamma useful))
 (use-modules (mgamma io))
+(use-modules (mgamma utils))
 (use-modules (mgamma core))
 (use-modules (ice-9 getopt-long))
 (use-modules (ice-9 format))
