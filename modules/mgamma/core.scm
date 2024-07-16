@@ -65,12 +65,6 @@
 (define (string-na? str)
   (string= "NA" str))
 
-(define memcpy
-  (foreign-library-function
-   #f "memcpy"
-   #:return-type '*
-   #:arg-types (list '* '* size_t)))
-
 (define (cleanup-mtx mtx)
   "Plug mean value instead of NaNs, whenever possible.
 Also subtract mean from all the values to 'center' them."
