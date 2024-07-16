@@ -682,12 +682,12 @@ EIGENVECTORS are computed from KINSHIP when #f."
               ;; Necessary because GSL/LAPACKE don't always provide
               ;; the right signs for eigenvectors.
               (or eigenvectors u))
-             (utw (blas:gemm u w #:transpose-a blas:+transpose+))
-             (uty (blas:gemm u y #:transpose-a blas:+transpose+))
+             (utw (blas:gemm u w #:transpose-a #t))
+             (uty (blas:gemm u y #:transpose-a #t))
              (y-col (mtx:column->vec! y 0))
              (uty-col (mtx:column->vec! uty 0))
              (uab (calc-uab-null utw uty-col))
-             (utx (blas:gemm u useful-geno #:transpose-a blas:+transpose+ #:transpose-b blas:+transpose+)))
+             (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t)))
         (when (= 1 n-phenotypes)
           (receive (lam logl-h0)
               (calc-lambda-null utw uty-col eval)
