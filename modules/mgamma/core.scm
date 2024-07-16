@@ -62,9 +62,6 @@
        (vec:set! vec index val)))
    vec))
 
-(define (string-na? str)
-  (string= "NA" str))
-
 (define (cleanup-mtx mtx)
   "Plug mean value instead of NaNs, whenever possible.
 Also subtract mean from all the values to 'center' them."
