@@ -1,13 +1,15 @@
 (define-module (mgamma core)
-  #:use-module (ice-9 ports)
-  #:use-module (ice-9 textual-ports)
-  #:use-module (ice-9 rdelim)
-  #:use-module (ice-9 match)
-  #:use-module (ice-9 format)
+  #:use-module (mgamma config)
+  #:use-module (mgamma io)
+  #:use-module (mgamma useful)
+  #:use-module (rnrs base)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-8)
   #:use-module (srfi srfi-26)
-  #:use-module (srfi srfi-43)
+  #:use-module (ice-9 match)
+  #:use-module (ice-9 format)
+  #:use-module (system foreign)
+  #:use-module (system foreign-library)
   #:use-module ((gsl core) #:prefix gsl:)
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl vectors) #:prefix vec:)
@@ -17,28 +19,10 @@
   #:use-module ((gsl linear-algebra) #:prefix linalg:)
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:use-module (system foreign)
-  #:use-module (system foreign-library)
-  #:use-module (rnrs bytevectors)
-  #:use-module (rnrs base)
   #:use-module (json)
-  #:export (mapsize
-            geno.txt->lmdb
-            geno.txt->genotypes-mtx
-            lmdb->genotypes-mtx
-            kinship-mtx
-            kinship->cxx.txt
-            kinship->lmdb
-            lmdb->kinship
-            cxx.txt->kinship
-            pheno.txt->pheno-mtx
-            covariates.txt->cvt-mtx
-            eigenu.txt->eigenvectors
-            useful-snps
-            useful-individuals
+  #:export (kinship-mtx
             cleanup-mtx
-            analyze
-            snp-params->assoc.txt))
+            analyze))
 
 (gsl:set-error-handler
  (lambda* (#:optional (reason "unknown reason") (file "unknown-file") (line -1) (errno -1) #:rest rest)
@@ -55,126 +39,6 @@
      (display error-text)
      (newline)
      (error 'gsl error-text))))
-
-(define mapsize (make-parameter (* 100 10485760)))
-(define n-regions (make-parameter 10))
-(define l-min (make-parameter 1e-5))
-(define l-max (make-parameter 1e+5))
-(define l-mle-null (make-parameter 0))
-(define log-mle-null (make-parameter 0))
-
-;; TODO: Make a state machine parser instead? Something like guile-csv
-;; TODO: Apply PEG to a whole file?
-(define separators-char-set (list->char-set '(#\Tab #\Space #\,)))
-
-(define (string-separate string)
-  "Split the string on tab, space, or comma sequences.
-Return a list of strings in between these separators."
-  (let ((string-len (string-length string)))
-    (let rec ((idx 0)
-              (start-idx #f))
-      (cond
-       ((< idx string-len)
-        (let* ((char (string-ref string idx))
-               (separator? (char-set-contains? separators-char-set char)))
-          (cond
-           ((and start-idx separator?)
-            (cons (substring string start-idx idx)
-                  (rec (1+ idx) #f)))
-           ((not (or start-idx separator?))
-            (rec (1+ idx) idx))
-           (else
-            (rec (1+ idx) start-idx)))))
-       ((and start-idx
-             (< start-idx idx))
-        (list (substring string start-idx idx)))
-       (else
-        '())))))
-
-;; For speed.
-(define %read-separated-lines-cache (make-hash-table))
-(define (read-separated-lines file)
-  "Read tab/space/comma-separated fields from FILE.
-Return a list of lists of values.
-Necessary because the biological data often comes in BIMBAM format, a
-frivolous mix of tab and comma separated values."
-  (if (hash-ref %read-separated-lines-cache file)
-      (hash-ref %read-separated-lines-cache file)
-      (begin
-        (hash-set!
-         %read-separated-lines-cache
-         file
-         (call-with-port (open-input-file file)
-           (lambda (port)
-             (remove
-              null?
-              (let read-lines ((line (first (%read-line port))))
-                (if (eof-object? line)
-                    '()
-                    (cons (string-separate line)
-                          (read-lines (first (%read-line port))))))))))
-        (hash-ref %read-separated-lines-cache file))))
-
-;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
-
-(define (read-bim file)
-  (let ((lines (read-separated-lines file)))
-    (map (lambda (split)
-           (let ( ;; How are morgans/centimorgans marked?
-                 (position (string->number (third split)))
-                 (base-pair-coordinate (string->number (fourth split))))
-             `(,(first split)
-               ,(second split)
-               ,position
-               ,base-pair-coordinate
-               ,@(cddddr split))))
-         lines)))
-
-;; (read-bim "/home/aartaka/git/GEMMA/example/mouse_hs1940.bim")
-
-(define (string->num/nan str)
-  "Convert the string to a valid float of NaN."
-  (if (string= "NA" str)
-      +nan.0
-      (string->number str)))
-
-(define (geno.txt->lmdb geno.txt-file lmdb-dir)
-  "Convert GENO.TXT-FILE to an LMDB-DIR-located database.
-Useful to speed up genotype matrix manipulation.
-The keys of the resulting DB are marker names.
-The values are `float' arrays (converted to `double' matrices when
-read back into Scheme) with one value per individual.
-DB also contains a \"meta\" record specifying the \"type\",
-\"version\", and whether the data if \"float\", as serialized JSON
-object."
-  (let ((lines (read-separated-lines geno.txt-file))
-        (float-size (sizeof float)))
-    (unless (file-exists? (string-append lmdb-dir "data.mdb"))
-      (mdb:call-with-wrapped-cursor
-       lmdb-dir #f
-       (lambda (env txn dbi cursor)
-         (format #t "Keys not found, filling the database at ~s.~%" lmdb-dir)
-         (mdb:put txn dbi
-                  (mdb:make-val (string->pointer "meta" "UTF-8") 4)
-                  (scm->json-string `(("type" . "geno")
-                                      ("version" . "0.0.1")
-                                      ("float" . #t))))
-         (do ((lines lines (cdr lines)))
-             ((null? lines))
-           (mdb:put txn dbi
-                    (mdb:make-val (first (first lines)))
-                    (let* ((values (cdddr (first lines)))
-                           (values-len (length values)))
-                      (mdb:make-val (make-c-struct
-                                     (make-list values-len float)
-                                     (map string->num/nan values))
-                                    (* values-len float-size)))
-                    mdb:+noodupdata+)))
-       #:mapsize (mapsize)))
-    (list (- (length (car lines)) 3)
-          (map car lines))))
-
-;; (geno.txt->lmdb "/home/aartaka/git/GEMMA/example/BXD_geno.txt" "/tmp/geno-mouse-lmdb/")
 
 (define (vec-mean vec)
   "Mean value of the VEC, with all the NaNs ignored."
@@ -201,130 +65,11 @@ object."
 (define (string-na? str)
   (string= "NA" str))
 
-(define (useful-individuals pheno-mtx cvt-mtx)
-  "Return a list of booleans marking individuals in PHENO-MTX.
-#t is useful/indicator individuals.
-#f is individuals with incomplete data and otherwise not useful."
-  (let* ((inds (do ((ind 0 (1+ ind))
-                    (inds '()
-                          (cons (not (nan? (mtx:get pheno-mtx ind 0)))
-                                inds)))
-                   ((= ind (mtx:rows pheno-mtx))
-                    (reverse! inds)))))
-    (when (and cvt-mtx
-               (positive? (mtx:cols cvt-mtx)))
-      (do ((inds inds (cdr inds))
-           (cvt 0 (1+ cvt)))
-          ((null? inds))
-        (when (zero? (mtx:get cvt-mtx cvt 0))
-          (set-car! inds #f))))
-    inds))
-
-(define* (useful-snps genotypes-mtx markers pheno-mtx covariates-mtx #:key (miss-level 0.05) (maf-level 0.01))
-  "Return a hash-table from SNP names to MAF values.
-Only includes the useful/indicator SNPs.
-Filter the SNPs for MAF being in (MAF-LEVEL, 1 - MAF-LEVEL) range and
-having less than MISS-LEVEL missing values."
-  (let* ((useful-inds (useful-individuals pheno-mtx covariates-mtx))
-         (ind-count (length useful-inds))
-         (useful-snp-table (make-hash-table))
-         (mtx-rows (mtx:rows genotypes-mtx))
-         (mtx-cols (mtx:columns genotypes-mtx)))
-    (do ((row 0 (1+ row))
-         (markers markers (cdr markers)))
-        ((= row mtx-rows))
-      (let* ((name (car markers))
-             (maf (do ((ind 0 (1+ ind))
-                       (useful-inds useful-inds (cdr useful-inds))
-                       (maf 0 (if (car useful-inds)
-                                  (+ maf (mtx:get genotypes-mtx row ind))
-                                  maf)))
-                      ((= ind mtx-cols) maf)))
-             (miss-count (do ((ind 0 (1+ ind))
-                              (useful-inds useful-inds (cdr useful-inds))
-                              (nans 0 (if (and (car useful-inds)
-                                               (nan? (mtx:get genotypes-mtx row ind)))
-                                          (1+ nans)
-                                          nans)))
-                             ((= ind mtx-cols) nans)))
-             (maf (/ maf (* 2 (- ind-count miss-count)))))
-        (when (and (< (/ miss-count ind-count) miss-level)
-                   (< maf-level maf (- 1 maf-level)))
-          (hash-set! useful-snp-table name maf))))
-    useful-snp-table))
-
-
 (define memcpy
   (foreign-library-function
    #f "memcpy"
    #:return-type '*
    #:arg-types (list '* '* size_t)))
-
-(define (pointer=? ptr1 ptr2 size)
-  (bytevector=? (pointer->bytevector ptr1 size)
-                (pointer->bytevector ptr2 size)))
-
-(define* (lmdb->genotypes-mtx lmdb-dir)
-  "Read the data from LMDB-DIR and convert it to GSL matrix.
-Useful because LMDB-DIR-resident data often comes as floats, not
-doubles."
-  (let* ((mtx #f)
-         (tmp-vec #f)
-         (line-idx 0)
-         (markers (list))
-         (float-size (sizeof float))
-         (meta #f))
-    (mdb:call-with-wrapped-cursor
-     lmdb-dir #f
-     (lambda (env txn dbi cursor)
-       (mdb:for-cursor
-        cursor
-        (lambda (key data)
-          (let ((individuals (/ (mdb:val-size data) float-size))
-                (meta? (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)))
-            (when (and (not mtx)
-                       (not meta?))
-              ;; Markers x individuals
-              (set! mtx (mtx:alloc
-                         ;; Meta record is mandatory, I guess?
-                         (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
-                         individuals)))
-            (if meta?
-                (set! meta (json-string->scm (mdb:val-data-string data)))
-                (do ((i 0 (1+ i))
-                     (inds (mdb:val-data-parse data (make-list individuals float))
-                           (cdr inds)))
-                    ((= i individuals))
-                  (mtx:set! mtx line-idx i (car inds))))
-            (unless meta?
-              (set! markers (cons (mdb:val-data-string key) markers))
-              (set! line-idx (1+ line-idx)))))))
-     #:mapsize (mapsize))
-    (when tmp-vec
-      (vec:free tmp-vec))
-    (list (or mtx (mtx:alloc 0 0 0))
-          (reverse! markers)
-          meta)))
-
-(define (geno.txt->genotypes-mtx geno.txt)
-  "Convert GENO.TXT-FILE to a proper genotype matrix
-Return a (MATRIX MARKER-NAMES) list."
-  (let* ((lines (read-separated-lines geno.txt))
-         (mtx (mtx:alloc (length lines)
-                         ;; The first 3 lines: marker, chr, and chr.
-                         (- (length (first lines)) 3) +nan.0)))
-    (do ((row 0 (1+ row))
-         (lines lines (cdr lines)))
-        ((null? lines))
-      (do ((col 0 (1+ col))
-           ;; cdddar: the elements starting from the third of the
-           ;; current line.
-           (inds (cdddar lines) (cdr inds)))
-          ((null? inds))
-        (let ((ind (string->number (first inds))))
-          (when ind
-            (mtx:set! mtx row col ind)))))
-    (list mtx (map first lines))))
 
 (define (cleanup-mtx mtx)
   "Plug mean value instead of NaNs, whenever possible.
@@ -378,117 +123,6 @@ Only calculate if for USEFUL-SNPS out of MARKERS."
       (mtx:free intermediate-mtx)
       (vec:free tmp-vec)
       result)))
-
-(define (kinship->lmdb kinship-mtx lmdb-dir)
-  "Dump KINSHIP-MTX to an LMDB residing in LMDB-DIR."
-  (let ((env (mdb:env-create #:mapsize (mapsize)))
-        (float-size (sizeof float))
-        (uint-size (sizeof unsigned-int))
-        (rows (mtx:rows kinship-mtx)))
-    (mdb:env-open env lmdb-dir)
-    (do ((row-step 1 (1+ row-step))
-         (initial-row 0 (+ initial-row row-step)))
-        ((> initial-row rows))
-      (let* ((txn (mdb:txn-begin env))
-             (dbi (mdb:dbi-open txn)))
-        (when (zero? (mdb:stat-entries (mdb:dbi-stat txn dbi)))
-          (mdb:put txn dbi
-                   (mdb:make-val (string->pointer "meta" "UTF-8") 4)
-                   (scm->json-string `(("type" . "GRM")
-                                       ("version" . "0.0.1")
-                                       ("float" . #t)
-                                       ("symmetric" . #t)))))
-        (do ((row initial-row (1+ row))
-             (row-size (* float-size (- rows initial-row))
-                       (- row-size float-size)))
-            ((or (= row rows)
-                 (= row (+ initial-row row-step))))
-          (mdb:put!
-           txn dbi
-           (mdb:make-val (make-c-struct (list unsigned-int) (list row))
-                         uint-size)
-           (mdb:make-val
-            (make-c-struct
-             (make-list (- rows row) float)
-             (let rec ((col row))
-               (if (= col rows)
-                   '()
-                   (cons (mtx:get kinship-mtx row col)
-                         (rec (1+ col))))))
-            row-size)))
-        (mdb:txn-commit txn)))))
-
-(define (lmdb->kinship lmdb-dir)
-  "Read kinship matrix from LMDB-DIR."
-  (let ((mtx #f))
-    (mdb:with-wrapped-cursor
-     (lmdb-dir #f #:mapsize (mapsize))
-     (env txn dbi cursor)
-     (mdb:for-cursor
-      cursor
-      (lambda (key value)
-        (unless mtx
-          ;; 1- because there's meta record in addition to data.
-          (set! mtx (mtx:alloc (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
-                               (1- (mdb:stat-entries (mdb:dbi-stat txn dbi)))
-                               +nan.0)))
-        (unless (pointer=? (string->pointer "meta" "UTF-8") (mdb:val-data key) 4)
-          (let ((row (first (mdb:val-data-parse key (list unsigned-int)))))
-            (do ((col row (1+ col))
-                 (data (mdb:val-data-parse
-                        value
-                        (make-list (- (mtx:rows mtx) row) float))
-                       (cdr data)))
-                ((= col (mtx:columns mtx)))
-              (mtx:set! mtx row col (car data))))))))
-    (mtx:for-each
-     (lambda (row column value)
-       (when (nan? value)
-         (mtx:set! mtx row column (mtx:get mtx column row))))
-     mtx)
-    mtx))
-
-(define (kinship->cxx.txt kinship-mtx cxx.txt)
-  "Dump KINSHIP-MTX to CXX.TXT file."
-  (let ((last-row 0))
-    (call-with-port (open-output-file cxx.txt)
-      (lambda (port)
-        (mtx:for-each
-         (lambda (row column value)
-           (when (not (= row last-row))
-             (newline port)
-             (set! last-row row))
-           (format port "~f\t " value))
-         kinship-mtx)))))
-
-(define (txt->mtx file.txt)
-  "Generic text-to-matrix reading.
-Return a `mtx:mtx?' of doubles/f64."
-  (let* ((lines (read-separated-lines file.txt))
-         (lines-len (length lines))
-         (line-len (length (first lines)))
-         (result (mtx:alloc lines-len line-len)))
-    (do ((row-idx 0 (1+ row-idx))
-         (row lines (cdr row)))
-        ((= row-idx lines-len))
-      (do ((column-idx 0 (1+ column-idx))
-           (column (first row) (cdr column)))
-          ((= column-idx line-len))
-        (mtx:set! result row-idx column-idx (string->num/nan (first column)))))
-    result))
-
-(define (cxx.txt->kinship cxx.txt)
-  (txt->mtx cxx.txt))
-
-(define (pheno.txt->pheno-mtx pheno.txt)
-  (txt->mtx pheno.txt))
-
-(define (covariates.txt->cvt-mtx covariates.txt)
-  (txt->mtx covariates.txt))
-
-(define (eigenu.txt->eigenvectors eigenu.txt)
-  "Read eigenU (matrix of eigenvectors) from the EIGENU.TXT file."
-  (txt->mtx eigenu.txt))
 
 (define (2+ number)
   (+ number 2))
@@ -742,11 +376,6 @@ Only include the data for USEFUL-INDIVIDUALS."
         (mtx:set! mtx i j (mtx:get mtx j i))))
     (vec:free w gw)
     mtx))
-
-;; Defining π here (as the largest precision fraction from Wikipedia),
-;; because I haven't found it in Guile standard lib (at least in
-;; the manual).
-(define +pi+ 245850922/78256779)
 
 ;; This function exists for the sole reason of closing over UAB et
 ;; al. while passing the generated functions to GSL root solvers.
@@ -1085,83 +714,6 @@ Return (LAMBDA LOGF) values."
                      #:upper lambda-h
                      #:lower lambda-l))))))))))))
 
-(define (useful-kinship-mtx kinship-mtx useful-inds)
-  "Only retain these individuals in the KINSHIP-MTX that are USEFUL-INDS.
-Create and return a new matrix of size equal to useful individuals
-number."
-  (let* ((n-useful (count identity useful-inds))
-         (new-mtx (mtx:alloc n-useful n-useful)))
-    (do ((outer-useful-inds useful-inds (cdr outer-useful-inds))
-         (kin-i 0 (1+ kin-i))
-         (i 0 (if (car outer-useful-inds)
-                  (1+ i)
-                  i)))
-        ((null? outer-useful-inds))
-      (when (car outer-useful-inds)
-        (do ((inner-useful-inds useful-inds (cdr inner-useful-inds))
-             (kin-j 0 (1+ kin-j))
-             (j 0 (if (car inner-useful-inds)
-                      (1+ j)
-                      j)))
-            ((null? inner-useful-inds))
-          (when (car inner-useful-inds)
-            (mtx:set! new-mtx i j
-                      (mtx:get kinship-mtx kin-i kin-j))))))
-    new-mtx))
-
-(define (useful-geno-mtx geno-mtx useful-inds)
-  "Remove non-USEFUL-INDS from GENO-MTX.
-Create and return a new matrix."
-  (let* ((n-useful (count identity useful-inds))
-         (new-mtx (mtx:alloc (mtx:rows geno-mtx) n-useful)))
-    (do ((row 0 (1+ row)))
-        ((= row (mtx:rows new-mtx)))
-      (do ((useful-inds useful-inds (cdr useful-inds))
-           (geno-i 0 (1+ geno-i))
-           (i 0 (if (car useful-inds)
-                    (1+ i)
-                    i)))
-          ((null? useful-inds))
-        (when (car useful-inds)
-          (mtx:set! new-mtx row i
-                    (mtx:get geno-mtx row geno-i)))))
-    new-mtx))
-
-(define (useful-geno-mtx-per-snps geno-mtx markers useful-snps)
-  "Only retain the USEFUL-SNPS in the GENO-MTX (ordered by MARKERS).
-Return a new matrix with cleaned-up SNPs."
-  (vec:with
-   (tmp (mtx:columns geno-mtx) 0)
-   (let* ((new-rows (hash-count (lambda (k v) v) useful-snps))
-          (new-mtx (mtx:alloc new-rows (mtx:columns geno-mtx) 0))
-          (i 0))
-     (do ((markers markers (cdr markers))
-          (row 0 (1+ row)))
-         ((= i new-rows))
-       (when (hash-ref useful-snps (car markers) #f)
-         (mtx:row->vec! geno-mtx row tmp)
-         (mtx:vec->row! tmp new-mtx i)
-         (set! i (1+ i))))
-     new-mtx)))
-
-(define (useful-pheno-mtx pheno-mtx useful-inds)
-  "Only retain USEFUL-INDividualS in PHENO-MTX.
-Return a new matrix with cleaned-up ones."
-  (let* ((n-useful (count identity useful-inds))
-         (new-mtx (mtx:alloc n-useful (mtx:columns pheno-mtx))))
-    (do ((useful-inds useful-inds (cdr useful-inds))
-         (pheno-i 0 (1+ pheno-i))
-         (i 0 (if (car useful-inds)
-                  (1+ i)
-                  i)))
-        ((null? useful-inds))
-      (when (car useful-inds)
-        (do ((col 0 (1+ col)))
-            ((= col (mtx:columns pheno-mtx)))
-          (mtx:set! new-mtx i col
-                    (mtx:get pheno-mtx pheno-i col)))))
-    new-mtx))
-
 (define (calc-lambda-null utw uty-col eval)
   "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
@@ -1274,24 +826,6 @@ EIGENVECTORS are computed from KINSHIP when #f."
                            p-wald
                            logl-alt))))))))
     per-snp-params))
-
-(define (snp-params->assoc.txt params-table assoc.txt)
-  "Dump PARAMS-TABLE to the ASSOC.TXT file."
-  (call-with-port (open-output-file assoc.txt)
-    (lambda (p)
-      (format p "rs\t maf\t beta\t se\t logl_H1\t l_remle\t p_wald~%")
-      (hash-map->list
-       (lambda (key value)
-         (match value
-           ((maf
-             beta se
-             lambda-remle
-             p-wald
-             logl-alt)
-            (format p "~a\t ~s\t ~s\t ~s\t ~s\t ~s\t ~s~%"
-                    key     maf  beta se   logl-alt lambda-remle p-wald))))
-       params-table))))
-
 
 ;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
 ;; (define geno-mtx (first geno))
