@@ -55,7 +55,7 @@ Using shell to get LMM params for given geno/pheno.
 # Convert geno to Mgamma LMDB-based format.
 mgamma convert -g /path/to/mgamma/example/BXD_geno.txt -o /tmp/mgamma-geno/data.mdb
 # Compute kinship matrix from geno&pheno.
-mgamma kinship -g /tmp/mgamma-geno/data.mdb -p /path/to/mgamma/example/BXD_pheno.txt
+mgamma kinship -g /tmp/mgamma-geno/data.mdb -p /path/to/mgamma/example/BXD_pheno.txt -o /tmp/mgamma-kin/data.mdb
 # Compute LMM params from geno, pheno, and kinship.
 mgamma gwa -g /tmp/mgamma-geno/data.mdb -p /path/to/mgamma/example/BXD_pheno.txt -k /tmp/mgamma-kin/data.mdb -o BXD.assoc.txt
 ```
