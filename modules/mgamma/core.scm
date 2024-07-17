@@ -61,6 +61,24 @@ Only calculate if for USEFUL-SNPS out of MARKERS."
       (vec:free tmp-vec)
       result)))
 
+(define (calc-covariate-pheno y w useful-pheno-mtx cvt-mtx useful-individuals)
+  "Put USEFUL-PHENO-MTX data into Y and CVT-MTX into W.
+Only include the data for USEFUL-INDIVIDUALS."
+  (mtx:copy! useful-pheno-mtx y)
+  (do ((n-covariates (if cvt-mtx
+                         (mtx:columns cvt-mtx)
+                         1))
+       (ci-test 0 (if (car inds)
+                      (1+ ci-test)
+                      ci-test))
+       (i 0 (1+ i))
+       (inds useful-individuals (cdr inds)))
+      ((null? inds))
+    (when (car inds)
+      (do ((cvt 0 (1+ cvt)))
+          ((= cvt n-covariates))
+        (mtx:set! w ci-test cvt (mtx:get cvt-mtx i cvt))))))
+
 (define (analyze geno markers kinship eigenvectors pheno pheno-nums cvt)
   "Return the per-snp params for MARKERS in GENO.
 Use KINSHIP, EIGENVECTORS , PHENO, and CVT (all matrices) for
