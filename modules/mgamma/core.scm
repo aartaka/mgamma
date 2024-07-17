@@ -678,7 +678,8 @@ Return (LAMBDA LOGF) values."
                        beta se
                        lam
                        p-wald
-                       logl-alt))))))))
+                       logl-alt))))))
+    per-snp-params))
 
 (define (analyze geno markers kinship eigenvectors pheno pheno-nums cvt)
   "Return the per-snp params for MARKERS in GENO.
