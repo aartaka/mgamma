@@ -5,6 +5,8 @@
             +pi+))
 
 (define mapsize (make-parameter (* 100 10485760)))
+
+;; LMM params
 (define n-regions (make-parameter 10))
 (define l-min (make-parameter 1e-5))
 (define l-max (make-parameter 1e+5))
