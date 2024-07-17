@@ -12,7 +12,11 @@
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl root) #:prefix root:)
-  #:export (lmm-analyze))
+  #:use-module ((gsl linear-algebra) #:prefix linalg:)
+  #:export (calc-lambda
+            calc-lambda-null
+            calc-vg-ve-beta
+            lmm-analyze))
 
 ;; C++ function returns a size_t, while this one returns a signed
 ;; int. But then, something else is broken if we get a negative here.
@@ -580,6 +584,42 @@ Return (LAMBDA LOGF) values."
               (se (abs (/ 1 (* tau p-xx))))
               (p-wald (gsl-cdf-fdist-q (* tau (- p-yy px-yy)) 1 df)))
          (values beta se p-wald)))))))
+
+(define (calc-vg-ve-beta l eval utw uty-col)
+  (let* ((n-covariates (mtx:columns utw))
+         (n-inds (mtx:rows utw))
+         (n-index (n-index n-covariates))
+         (uab (calc-uab-null utw uty-col))
+         (hiw (mtx:copy! utw)))
+    (vec:with
+     (v-temp (vec:length eval) eval)
+     (vec:scale! v-temp l)
+     (vec:add-constant! v-temp 1)
+     (vec:with
+      (hi-eval (vec:length eval) 1)
+      (vec:divide! hi-eval v-temp)
+      (vec:with
+       (hiw-col-tmp (mtx:rows hiw))
+       (do ((i 0 (1+ i)))
+           ((= i (mtx:columns hiw)))
+         (mtx:column->vec! hiw i hiw-col-tmp)
+         (vec:multiply! hiw-col-tmp hi-eval)
+         (mtx:vec->column! hiw-col-tmp hiw i)))
+      (let ((whiw (blas:gemm hiw utw #:transpose-a #t))
+            (whiy (blas:gemv hiw uty-col))
+            (pab (mtx:alloc (2+ n-covariates) n-index)))
+        (calc-pab! uab pab hi-eval n-covariates)
+        (receive (lu perms signum)
+            (linalg:decompose whiw)
+          (let* ((beta (linalg:solve lu perms whiy))
+                 (index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+                 (p-yy (mtx:get pab n-covariates index-yy))
+                 (ve (/ p-yy (- n-inds n-covariates)))
+                 (vg (* ve l)))
+            (mtx:free uab hiw whiw pab)
+            (vec:free whiy)
+            ;; TODO: se_beta, Vbeta etc.
+            (values vg ve beta))))))))
 
 (define (lmm-analyze markers useful-geno useful-inds useful-snps
                      u eval utw uty-col
