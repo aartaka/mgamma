@@ -19,7 +19,7 @@
   #:use-module ((lmdb lmdb) #:prefix mdb:)
   #:use-module (json)
   #:export (kinship-mtx
-            lmm-analyze))
+            analyze))
 
 (gsl:set-error-handler
  (lambda* (#:optional (reason "unknown reason") (file "unknown-file") (line -1) (errno -1) #:rest rest)
@@ -645,15 +645,53 @@ Return (LAMBDA LOGF) values."
               (p-wald (gsl-cdf-fdist-q (* tau (- p-yy px-yy)) 1 df)))
          (values beta se p-wald)))))))
 
-(define (lmm-analyze geno markers kinship eigenvectors pheno cvt)
+(define (lmm-analyze markers useful-geno useful-inds useful-snps
+                     u eval utw uty-col
+                     n-covariates)
+  (let* ((n-markers (length markers))
+         (n-phenotypes (mtx:columns utw))
+         (n-useful-inds (length useful-inds))
+         (uab (calc-uab-null utw uty-col))
+         (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t))
+         (per-snp-params (make-hash-table n-markers)))
+    (receive (lam logl-h0)
+        (calc-lambda-null utw uty-col eval)
+      (l-mle-null lam)
+      (log-mle-null logl-h0))
+    ;; TODO: Rest of the code for the single phenotype case
+    ;; (gemma.cpp~L2700)
+    (vec:with
+     (tmp (mtx:rows utx))
+     (do ((i 0 (1+ i))
+          (markers markers (cdr markers)))
+         ((= i n-markers))
+       (mtx:column->vec! utx i tmp)
+       (calc-uab-alt! utw uty-col tmp uab n-covariates)
+       (receive (lam logl-alt)
+           (calc-lambda #f n-useful-inds n-covariates uab eval)
+         (receive (beta se p-wald)
+             (calc-rlwald lam n-useful-inds n-covariates uab eval)
+           (hash-set! per-snp-params (car markers)
+                      (list
+                       ;; Maf
+                       (hash-ref useful-snps (car markers))
+                       beta se
+                       lam
+                       p-wald
+                       logl-alt))))))))
+
+(define (analyze geno markers kinship eigenvectors pheno pheno-nums cvt)
   "Return the per-snp params for MARKERS in GENO.
 Use KINSHIP, EIGENVECTORS , PHENO, and CVT (all matrices) for
 computations, but mostly clean them up into new ones and use those.
 KINSHIP is computed from GENO when #f.
-EIGENVECTORS are computed from KINSHIP when #f."
+EIGENVECTORS are computed from KINSHIP when #f.
+In case PHENO-NUMS is a non-empty non-false list of numbers, run
+multivariate LMM on the data instead of univariate. PHENO-NUMS should
+be zero-based."
   (let* ((useful-individuals (useful-individuals pheno cvt))
          (useful-geno (useful-geno-mtx geno useful-individuals))
-         (useful-pheno (useful-pheno-mtx pheno useful-individuals))
+         (useful-pheno (useful-pheno-mtx pheno useful-individuals pheno-nums))
          (useful-snps (useful-snps useful-geno markers useful-pheno cvt))
          (cvt (or cvt
                   ;; This is not useful-kinship so that
@@ -665,14 +703,14 @@ EIGENVECTORS are computed from KINSHIP when #f."
                              (useful-kinship-mtx kinship useful-individuals)
                              (kinship-mtx useful-geno markers useful-snps)))
          (n-covariates (mtx:columns cvt))
-         (n-phenotypes (mtx:columns useful-pheno))
+         (n-phenotypes (if pheno-nums
+                           (length pheno-nums)
+                           ;; (mtx:columns useful-pheno)
+                           1))
          (n-useful-inds (mtx:rows useful-kinship))
          (n-markers (mtx:rows useful-geno))
          (y (mtx:alloc n-useful-inds n-phenotypes 0))
-         (w (mtx:alloc n-useful-inds n-covariates 0))
-         (b (mtx:alloc n-phenotypes n-covariates))
-         (n-index (n-index n-covariates))
-         (per-snp-params (make-hash-table n-markers)))
+         (w (mtx:alloc n-useful-inds n-covariates 0)))
     (cleanup-mtx useful-geno)
     (calc-covariate-pheno y w useful-pheno cvt useful-individuals)
     (center-matrix! useful-kinship)
@@ -685,36 +723,9 @@ EIGENVECTORS are computed from KINSHIP when #f."
              (utw (blas:gemm u w #:transpose-a #t))
              (uty (blas:gemm u y #:transpose-a #t))
              (y-col (mtx:column->vec! y 0))
-             (uty-col (mtx:column->vec! uty 0))
-             (uab (calc-uab-null utw uty-col))
-             (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t)))
-        (when (= 1 n-phenotypes)
-          (receive (lam logl-h0)
-              (calc-lambda-null utw uty-col eval)
-            (l-mle-null lam)
-            (log-mle-null logl-h0))
-          ;; TODO
-          #f)
-        (vec:with
-         (tmp (mtx:rows utx))
-         (do ((i 0 (1+ i))
-              (markers markers (cdr markers)))
-             ((= i n-markers))
-           (mtx:column->vec! utx i tmp)
-           (calc-uab-alt! utw uty-col tmp uab n-covariates)
-           (receive (lam logl-alt)
-               (calc-lambda #f n-useful-inds n-covariates uab eval)
-             (receive (beta se p-wald)
-                 (calc-rlwald lam n-useful-inds n-covariates uab eval)
-               (hash-set! per-snp-params (car markers)
-                          (list
-                           ;; Maf
-                           (hash-ref useful-snps (car markers))
-                           beta se
-                           lam
-                           p-wald
-                           logl-alt))))))))
-    per-snp-params))
+             (uty-col (mtx:column->vec! uty 0)))
+        (if (= 1 n-phenotypes)
+            (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty-col n-covariates))))))
 
 ;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
 ;; (define geno-mtx (first geno))

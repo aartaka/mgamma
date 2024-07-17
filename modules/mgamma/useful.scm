@@ -120,20 +120,23 @@ Return a new matrix with cleaned-up SNPs."
          (set! i (1+ i))))
      new-mtx)))
 
-(define (useful-pheno-mtx pheno-mtx useful-inds)
+(define (useful-pheno-mtx pheno-mtx useful-inds pheno-nums)
   "Only retain USEFUL-INDividualS in PHENO-MTX.
+Also only retain the PHENO-NUMS-numbered columns.
 Return a new matrix with cleaned-up ones."
   (let* ((n-useful (count identity useful-inds))
-         (new-mtx (mtx:alloc n-useful (mtx:columns pheno-mtx))))
+         (new-mtx (mtx:alloc n-useful (length pheno-nums))))
     (do ((useful-inds useful-inds (cdr useful-inds))
-         (pheno-i 0 (1+ pheno-i))
-         (i 0 (if (car useful-inds)
-                  (1+ i)
-                  i)))
+         (row 0 (1+ row))
+         (i 0))
         ((null? useful-inds))
       (when (car useful-inds)
-        (do ((col 0 (1+ col)))
+        (do ((col 0 (1+ col))
+             (j 0))
             ((= col (mtx:columns pheno-mtx)))
-          (mtx:set! new-mtx i col
-                    (mtx:get pheno-mtx pheno-i col)))))
+          (when (member col pheno-nums)
+            (mtx:set! new-mtx i j
+                      (mtx:get pheno-mtx row col))
+            (set! j (1+ j))))
+        (set! i (1+ i))))
     new-mtx))
