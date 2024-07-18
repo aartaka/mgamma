@@ -1,7 +1,7 @@
 (define-module (mgamma config)
   #:export (mapsize
-            n-regions l-min l-max
-            l-mle-null log-mle-null
+            n-regions l-min l-max l-mle-null log-mle-null
+            p-nr em-iter em-precision nr-iter nr-precision crt
             +pi+))
 
 (define mapsize (make-parameter (* 100 10485760)))
