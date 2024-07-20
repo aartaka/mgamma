@@ -6,6 +6,7 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
+  #:export-syntax (dotimes)
   #:export (2+
             vec-mean
             vec-replace-nan
@@ -15,6 +16,13 @@
 
 (define (2+ number)
   (+ number 2))
+
+(define-syntax dotimes
+  (syntax-rules ()
+    ((_ (var upper-bound) body ...)
+     (do ((var 0 (1+ var)))
+         ((= var upper-bound))
+       body ...))))
 
 (define (vec-mean vec)
   "Mean value of the VEC, with all the NaNs ignored."
