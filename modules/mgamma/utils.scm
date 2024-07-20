@@ -1,4 +1,5 @@
 (define-module (mgamma utils)
+  #:use-module (srfi srfi-8)
   #:use-module (ice-9 match)
   #:use-module (system foreign)
   #:use-module ((gsl matrices) #:prefix mtx:)
@@ -6,12 +7,13 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:export-syntax (dotimes)
+  #:export-syntax (dotimes with-cleanup)
   #:export (2+
             vec-mean
             vec-replace-nan
             cleanup-mtx
             center-matrix!
+            eigendecomposition
             eigendecomposition-zeroed))
 
 (define (2+ number)
@@ -93,11 +95,7 @@ Also subtract mean from all the values to 'center' them."
     (vec:free w gw)
     mtx))
 
-(define (eigendecomposition-zeroed kinship)
-  "Eigendecomposition, but zero the values below threshold.
-Return two values:
-- EVALUES-VEC
-- EVECTORS-MTX"
+(define (eigendecomposition kinship)
   (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
     (lapack:dsyevr
@@ -113,9 +111,27 @@ Return two values:
      (make-c-struct
       (make-list (* 2 (mtx:rows kinship)) int)
       (make-list (* 2 (mtx:rows kinship)) 0)))
+    (values evalues-vec evectors-mtx)))
+
+(define (eigendecomposition-zeroed kinship)
+  "Eigendecomposition, but zero the values below threshold.
+Return two values:
+- EVALUES-VEC
+- EVECTORS-MTX"
+  (receive (evalues-vec evectors-mtx)
+      (eigendecomposition kinship)
     (do ((i 0 (1+ i)))
         ((= i (vec:length evalues-vec)))
       (when (< (abs (vec:get evalues-vec i)) 1e-10)
         ;; pylmm uses 1e-6 instead
         (vec:set! evalues-vec i 0)))
     (values evalues-vec evectors-mtx)))
+
+(define-syntax-rule (with-cleanup form cleanup ...)
+  (dynamic-wind
+    (lambda ()
+      #t)
+    (lambda ()
+      form)
+    (lambda ()
+      cleanup ...)))
