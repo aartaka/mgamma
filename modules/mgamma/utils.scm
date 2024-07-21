@@ -14,7 +14,9 @@
             cleanup-mtx
             center-matrix!
             eigendecomposition
-            eigendecomposition-zeroed))
+            eigendecomposition-zeroed
+            submatrix
+            submatrix->mtx!))
 
 (define (2+ number)
   (+ number 2))
@@ -135,3 +137,26 @@ Return two values:
       form)
     (lambda ()
       cleanup ...)))
+
+(define (submatrix mtx start-row start-col rows cols)
+  "Get a ROWSxCOLS submatrix of MTX, left upper corner at START-ROW, START-COL."
+  (let ((new (mtx:alloc rows cols 0)))
+    (do ((row 0 (1+ row))
+         (src-row start-row (1+ src-row)))
+        ((= row rows))
+      (do ((col 0 (1+ col))
+           (src-col start-col (1+ src-col)))
+          ((= col cols))
+        (mtx:set! new row col (mtx:get mtx src-row src-col))))))
+
+(define (submatrix->mtx! submatrix mtx mtx-start-row mtx-start-col rows cols)
+  "Copy SUBMATRIX back into MXT starting on (mtx-start-row,mtx-start-col)
+and copying a ROWSxCOLS chunk."
+  (let ((new (mtx:alloc rows cols 0)))
+    (do ((row 0 (1+ row))
+         (mtx-row mtx-start-row (1+ mtx-row)))
+        ((= row rows))
+      (do ((col 0 (1+ col))
+           (mtx-col mtx-start-col (1+ mtx-col)))
+          ((= col cols))
+        (mtx:set! mtx mtx-row mtx-col (mtx:get submatrix row col))))))
