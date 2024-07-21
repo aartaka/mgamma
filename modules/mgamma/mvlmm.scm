@@ -564,7 +564,7 @@
                      (* 1/2 d-size (linalg:%determinant-log lu)))
                   (* -1/2 n-size d-size (log (* 2 +pi+)))))
              (logl-new 0)
-             (logl-old 0 logl-new)
+             (logl-old 0)
              (positive-definite? #t))
          ;; TODO: `nr-precision' checks
          (dotimes (t (nr-iter))
@@ -615,7 +615,7 @@
                                              (* 1/2 logdet-q)
                                              0)
                                          (* 1/2 ypy))))))))
-             (set logl-old logl-new)
+             (set! logl-old logl-new)
              ;; TODO CalcDev
              )))))))
 
@@ -632,5 +632,5 @@
       (receive (vg ve logl-h0)
           (mph-em #t eval x y vg ve b)
         (receive (hessian crt-a crt-b crt-c logl-h0)
-            (mph-nr #t eval x y)
-          )))))
+            (mph-nr #t eval x y vg ve)
+          #t)))))
