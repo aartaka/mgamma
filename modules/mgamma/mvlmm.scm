@@ -404,22 +404,21 @@
     (vec:with
      (vec-v (* 2 v-size))
      (dotimes (i d-size)
-       (dotimes (j d-size)
-         (unless (< j i)
-           (let ((v (getindex i j d-size)))
-             (vec:set! vec-v v (mtx:get vg i j))
-             (vec:set! vec-v (+ v v-size) (mtx:get ve i j))))))
+       (dorange
+        (j i d-size)
+        (let ((v (getindex i j d-size)))
+          (vec:set! vec-v v (mtx:get vg i j))
+          (vec:set! vec-v (+ v v-size) (mtx:get ve i j)))))
      (blas:gemv! hessian gradient vec-v #:alpha (* -1 scale))
      (dotimes (i d-size)
-       (dotimes (j d-size)
-         (unless (< j i)
-           (let* ((v (getindex i j d-size))
-                  (dg (vec:get vec-v v))
-                  (de (vec:get vec-v (+ v v-size))))
-             (mtx:set! vg i j dg)
-             (mtx:set! vg j i dg)
-             (mtx:set! ve i j de)
-             (mtx:set! ve j i de))))))))
+       (dorange (j i d-size)
+         (let* ((v (getindex i j d-size))
+                (dg (vec:get vec-v v))
+                (de (vec:get vec-v (+ v v-size))))
+           (mtx:set! vg i j dg)
+           (mtx:set! vg j i dg)
+           (mtx:set! ve i j de)
+           (mtx:set! ve j i de)))))))
 
 (define (calc-hi-qi eval x vg ve)
   "CalcHiQi"
@@ -572,14 +571,14 @@
          (xhidhiy-all-g (mtx:calloc dc-size v-size))
          (xhidhiy-all-e (mtx:calloc dc-size v-size)))
     (dotimes (i d-size)
-      (dotimes (j d-size)
-        (unless (< j i)
-          (let ((v (getindex i j d-size)))
-            (receive (xhidhiy-g xhidhiy-e)
-                (calc-xhidhiy eval xhi hiy i j)
-              (mtx:vec->column! xhidhiy-g xhidhiy-all-g v)
-              (mtx:vec->column! xhidhiy-e xhidhiy-all-e v)
-              (vec:free xhidhiy-g xhidhiy-e))))))))
+      (dorange
+       (j i d-size)
+       (let ((v (getindex i j d-size)))
+         (receive (xhidhiy-g xhidhiy-e)
+             (calc-xhidhiy eval xhi hiy i j)
+           (mtx:vec->column! xhidhiy-g xhidhiy-all-g v)
+           (mtx:vec->column! xhidhiy-e xhidhiy-all-e v)
+           (vec:free xhidhiy-g xhidhiy-e)))))))
 
 (define (calc-xhidhix eval xhi i j)
   "Calc_xHiDHix"
@@ -619,18 +618,18 @@
          (xhidhix-all-g (mtx:calloc dc-size (* v-size d-size)))
          (xhidhix-all-e (mtx:calloc dc-size (* v-size d-size))))
     (dotimes (i d-size)
-      (dotimes (j d-size)
-        (unless (< j i)
-          (let ((v (getindex i j d-size)))
-            (receive (xhidhix-g xhidhix-e)
-                (calc-xhidhix eval xhi i j)
-              (submatrix->mtx!
-               xhidhix-g xhidhix-all-g
-               0 (* v dc-size) dc-size dc-size)
-              (submatrix->mtx!
-               xhidhix-e xhidhix-all-e
-               0 (* v dc-size) dc-size dc-size)
-              (mtx:free xhidhix-g xhidhix-e))))))
+      (dorange
+       (j i d-size)
+       (let ((v (getindex i j d-size)))
+         (receive (xhidhix-g xhidhix-e)
+             (calc-xhidhix eval xhi i j)
+           (submatrix->mtx!
+            xhidhix-g xhidhix-all-g
+            0 (* v dc-size) dc-size dc-size)
+           (submatrix->mtx!
+            xhidhix-e xhidhix-all-e
+            0 (* v dc-size) dc-size dc-size)
+           (mtx:free xhidhix-g xhidhix-e)))))
     (values xhidhix-all-g xhidhix-all-e)))
 
 (define (calc-xhidhixqixhiy-all xhidhix-all-g xhidhix-all-e qixhiy)
@@ -654,8 +653,45 @@
         (mtx:free xhidhix-g xhidhix-e)))
     (values xhidhixqixhiy-all-g xhidhixqixhiy-all-e)))
 
-(define (calc-xhidhidhiy eval hi xhi xiy i1 j1 i2 j2)
-  "Calc_xHiDHiDHiy")
+(define (calc-xhidhidhiy eval hi xhi hiy i1 j1 i2 j2)
+  "Calc_xHiDHiDHiy"
+  (let* ((n-size (vec:length eval))
+         (d-size (mtx:rows hiy))
+         (dc-size (mtx:columns xhi))
+         (v-size (* d-size (1+ d-size) 1/2))
+         (xhidhidhiy-gg (mtx:alloc dc-size (expt v-size 2) 0))
+         (xhidhidhiy-ee (mtx:copy! xhidhidhiy-gg))
+         (xhidhidhiy-ge (mtx:copy! xhidhidhiy-gg)))
+    (dotimes (k n-size)
+      (mtx:with-column
+       (xhi-col-i xhi (+ i1 (* k d-size)))
+       (mtx:with-column
+        (xhi-col-j xhi (+ j1 (* k d-size)))
+        (let* ((delta (vec:get eval k))
+               (d-hiy-i (mtx:get hiy i2 k))
+               (d-hiy-j (mtx:get hiy j2 k))
+               (d-hi-i1i2 (mtx:get hi i1 (+ i2 (* k d-size))))
+               (d-hi-i1j2 (mtx:get hi i1 (+ j2 (* k d-size))))
+               (d-hi-j1i2 (mtx:get hi j1 (+ i2 (* k d-size))))
+               (d-hi-j1j2 (mtx:get hi j1 (+ j2 (* k d-size))))
+               (equal? (= i2 j2)))
+          (blas:axpy! (* delta delta d-hi-j1i2 d-hiy-j)
+                      xhi-col-i xhidhidhiy-gg)
+          (blas:axpy! (* d-hi-j1i2 d-hiy-j) xhi-col-i xhidhidhiy-ee)
+          (blas:axpy! (* delta d-hi-j1i2 d-hiy-j) xhi-col-i xhidhidhiy-ge)
+          (unless equal?
+            (blas:axpy! (* delta delta d-hi-i1i2 d-hiy-j) xhi-col-j xhidhidhiy-gg)
+            (blas:axpy! (* d-hi-i1i2 d-hiy-j) xhi-col-j xhidhidhiy-ee)
+            (blas:axpy! (* delta d-hi-i1i2 d-hiy-j) xhi-col-j xhidhidhiy-ge))
+          (unless (= i2 j2)
+            (blas:axpy! (* delta delta d-hi-j1j2 d-hiy-i) xhi-col-i xhidhidhiy-gg)
+            (blas:axpy! (* d-hi-j1j2 d-hiy-i) xhi-col-i xhidhidhiy-ee)
+            (blas:axpy! (* delta d-hi-j1j2 d-hiy-j) xhi-col-i xhidhidhiy-ge)
+            (unless equal?
+              (blas:axpy! (* delta delta d-hi-i1j2 d-hiy-i) xhi-col-j xhidhidhiy-gg)
+              (blas:axpy! (* d-hi-i1j2 d-hiy-i) xhi-col-j xhidhidhiy-ee)
+              (blas:axpy! (* delta d-hi-i1j2 d-hiy-i) xhi-col-j xhidhidhiy-ge)))))))
+    (values xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge)))
 
 (define (calc-xhidhidhiy-all v-size eval hi xhi hiy)
   "Calc_xHiDHiDHiy_all"
@@ -665,22 +701,142 @@
          (xhidhidhiy-all-ee (mtx:copy! xhidhidhiy-all-gg))
          (xhidhidhiy-all-ge (mtx:copy! xhidhidhiy-all-gg)))
     (dotimes (i1 d-size)
-      (dotimes (j1 d-size)
-        (unless (< j1 i1)
-          (let ((v1 (getindex i1 j1 d-size)))
-            (dotimes (i2 d-size)
-              (dotimes (j2 d-size)
-                (unless (< j2 i2)
-                  (let ((v2 (getindex i2 j2 d-size)))
-                    (receive (xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge)
-                        (calc-xhidhidhiy eval hi xhi hiy i1 j1 i2 j2)
-                      (mtx:vec->column!
-                       xhidhidhiy-gg xhidhidhiy-all-gg (+ v2 (* v1 v-size)))
-                      (mtx:vec->column!
-                       xhidhidhiy-ee xhidhidhiy-all-ee (+ v2 (* v1 v-size)))
-                      (mtx:vec->column!
-                       xhidhidhiy-ge xhidhidhiy-all-ge (+ v2 (* v1 v-size)))
-                      (vec:free xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge))))))))))))
+      (dorange
+       (j1 i1 d-size)
+       (let ((v1 (getindex i1 j1 d-size)))
+         (dotimes (i2 d-size)
+           (dorange
+            (j2 i2 d-size)
+            (let ((v2 (getindex i2 j2 d-size)))
+              (receive (xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge)
+                  (calc-xhidhidhiy eval hi xhi hiy i1 j1 i2 j2)
+                (mtx:vec->column!
+                 xhidhidhiy-gg xhidhidhiy-all-gg (+ v2 (* v1 v-size)))
+                (mtx:vec->column!
+                 xhidhidhiy-ee xhidhidhiy-all-ee (+ v2 (* v1 v-size)))
+                (mtx:vec->column!
+                 xhidhidhiy-ge xhidhidhiy-all-ge (+ v2 (* v1 v-size)))
+                (vec:free xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge))))))))))
+
+(define (calc-xhidhidhix eval hi xhi i1 j1 i2 j2)
+  "Calc_xHiDHiDHix"
+  (let* ((n-size (vec:length eval))
+         (d-size (mtx:rows hi))
+         (dc-size (mtx:rows xhi))
+         (xhidhidhix-gg (mtx:alloc-square dc-size 0))
+         (xhidhidhix-ee (mtx:alloc-square dc-size 0))
+         (xhidhidhix-ge (mtx:alloc-square dc-size 0)))
+    (mtx:with
+     (mat-dcdc dc-size dc-size)
+     (dotimes (k n-size)
+       (mtx:with-column
+        (xhi-col-i1 xhi (+ i1 (* k d-size)))
+        (mtx:with-column
+         (xhi-col-j1 xhi (+ j1 (* k d-size)))
+         (mtx:with-column
+          (xhi-col-i2 xhi (+ i2 (* k d-size)))
+          (mtx:with-column
+           (xhi-col-j2 xhi (+ j2 (* k d-size)))
+           (let ((delta (vec:get eval k))
+                 (d-hi-i1i2 (mtx:get hi i1 (+ i2 (* k d-size))))
+                 (d-hi-i1j2 (mtx:get hi i1 (+ j2 (* k d-size))))
+                 (d-hi-j1i2 (mtx:get hi j1 (+ i2 (* k d-size))))
+                 (d-hi-j1j2 (mtx:get hi j1 (+ j2 (* k d-size))))
+                 (equal? (= i1 j1)))
+             (mtx:fill! mat-dcdc 0)
+             (blas:ger! xhi-col-i1 xhi-col-j2 mat-dcdc #:alpha d-hi-j1i2)
+             (mtx:add! xhidhidhix-ee mat-dcdc)
+             (mtx:scale! mat-dcdc delta)
+             (mtx:add! xhidhidhix-ge mat-dcdc)
+             (mtx:scale! mat-dcdc delta)
+             (mtx:add xhidhidhix-gg mat-dcdc)
+             (unless equal?
+               (mtx:fill! mat-dcdc 0)
+               (blas:ger! xhi-col-j1 xhi-col-j2 mat-dcdc #:alpha d-hi-i1i2)
+               (mtx:add! xhidhidhix-ee mat-dcdc)
+               (mtx:scale! mat-dcdc delta)
+               (mtx:add! xhidhidhix-ge mat-dcdc)
+               (mtx:scale! mat-dcdc delta)
+               (mtx:add! xhidhidhix-gg mat-dcdc))
+             (unless (= i2 j2)
+               (mtx:fill! mat-dcdc 0)
+               (blas:ger! xhi-col-i1 xhi-col-i2 mat-dcdc #:alpha d-hi-j1j2)
+               (mtx:add xhidhidhix-ee mat-dcdc)
+               (mtx:scale! mat-dcdc delta)
+               (mtx:add xhidhidhix-ge mat-dcdc)
+               (mtx:scale! mat-dcdc delta)
+               (mtx:add xhidhidhix-gg mat-dcdc)
+               (unless equal?
+                 (mtx:fill! mat-dcdc 0)
+                 (blas:ger! xhi-col-j1 xhi-col-i2 mat-dcdc #:alpha d-hi-i1j2)
+                 (mtx:add! xhidhidhix-ee mat-dcdc)
+                 (mtx:scale! mat-dcdc delta)
+                 (mtx:add! xhidhidhix-ge mat-dcdc)
+                 (mtx:scale mat-dcdc delta)
+                 (mtx:add! xhidhidhix-gg mat-dcdc))))))))))
+    (values xhidhidhix-gg xhidhidhix-ee xhidhidhix-ge)))
+
+(define (calc-xhidhidhix-all v-size eval hi xhi)
+  "Calc_xHiDHiDHix_all"
+  (let* ((d-size (mtx:columns xhi))
+         (dc-size (mtx:rows xhi))
+         (v-size (* d-size (1+ d-size) 1/2))
+         (xhidhidhix-all-gg (mtx:alloc dc-size (* v-size v-size dc-size)))
+         (xhidhidhix-all-ee (mtx:alloc dc-size (* v-size v-size dc-size)))
+         (xhidhidhix-all-ge (mtx:alloc dc-size (* v-size v-size dc-size))))
+    (dotimes (i1 d-size)
+      (dorange
+       (j1 i1 d-size)
+       (let ((v1 (getindex i1 j1 d-size)))
+         (dotimes (i2 d-size)
+           (dorange
+            (j2 i2 d-size)
+            (let ((v2 (getindex i2 j2 d-size)))
+              (unless (< v2 v1)
+                (receive (xhidhidhix-gg1 xhidhidhix-ee1 xhidhidhix-ge1)
+                    (calc-xhidhidhix eval hi xhi i1 j1 i2 j2)
+                  (submatrix->mtx!
+                   xhidhidhix-gg1 xhidhidhix-all-gg
+                   0 (* d-size (+ v1 (* v2 v-size))) dc-size dc-size)
+                  (submatrix->mtx!
+                   xhidhidhix-ee1 xhidhidhix-all-ee
+                   0 (* d-size (+ v1 (* v2 v-size))) dc-size dc-size)
+                  (submatrix->mtx!
+                   xhidhidhix-ge1 xhidhidhix-all-ge
+                   0 (* d-size (+ v1 (* v2 v-size))) dc-size dc-size)
+                  (mtx:free xhidhidhix-gg1 xhidhidhix-ee1 xhidhidhix-ge1)))))))))))
+
+(define (calc-qivec-all qi vec-all-g vec-all-e)
+  "Calc_QiVec_all"
+  (let* ((qivec-all-g (vec:alloc (mtx:rows qi)))
+         (qivec-all-e (vec:alloc (mtx:rows qi))))
+    (dotimes (i (mtx:columns vec-all-g))
+      (mtx:with-column
+       (vec-g vec-all-g i)
+       (mtx:with-column
+        (vec-e vec-all-e i)
+        (let ((quivec-g (blas:gemv qi vec-g))
+              (quivec-e (blas:gemv qi vec-e)))
+          (mtx:vec->column! quivec-g qivec-all-g i)
+          (mtx:vec->column! quivec-e qivec-all-e i)
+          (vec:free quivec-g quivec-e)))))))
+
+(define (calc-qimat-all qi mat-all-g mat-all-e)
+  "Calc_QiMat_all"
+  (let* ((dc-size (mtx:rows qi))
+         (v-size (/ (mtx:columns mat-all-g)
+                    (mtx:rows mat-all-g)))
+         (qimat-all-g (mtx:alloc dc-size (* v-size dc-size)))
+         (qimat-all-e (mtx:copy! qimat-all-g)))
+    (dotimes (i v-size)
+      (let* ((mat-g (submatrix mat-all-g 0 (* i dc-size) dc-size dc-size))
+             (mat-e (submatrix mat-all-e 0 (* i dc-size) dc-size dc-size))
+             (qimat-g (blas:gemm qi mat-g))
+             (qimat-e (blas:gemm qi mat-e)))
+        (submatrix->mtx! qimat-g qimat-all-g 0 (* i dc-size) dc-size dc-size)
+        (submatrix->mtx! qimat-e qimat-all-e 0 (* i dc-size) dc-size dc-size)
+        (mtx:free mat-g mat-e qimat-g qimat-e)))
+    (values qimat-all-g qimat-all-e)))
 
 (define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian-inv)
   "CalcDev"
@@ -696,8 +852,23 @@
             (calc-xhidhixqixhiy-all xhidhix-all-g xhidhix-all-e qixhiy)
           (receive (xhidhidhiy-all-gg xhidhidhiy-all-ee xhidhidhiy-all-ge)
               (calc-xhidhidhiy-all v-size eval hi xhi hiy)
-            #t)
-          )))))
+            (receive (xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge)
+                (calc-xhidhidhix-all v-size eval hi xhi)
+              (receive (qixhidhiy-all-g qixhidhiy-all-e)
+                  (calc-qivec-all qi xhidhiy-all-g xhidhiy-all-e)
+                (receive (qixhidhixqixhiy-all-g qixhidhixqixhiy-all-e)
+                    (calc-qivec-all qi xhidhixqixhiy-all-g xhidhixqixhiy-all-e)
+                  (receive (qixhidhix-all-g qixhidhix-all-e)
+                      (calc-qimat-all qi xhidhix-all-g xhidhix-all-e)
+                    (dotimes (i1 d-size)
+                      (dorange
+                       (j1 i1 d-size)
+                       (let ((v1 (getindex i1 j1 d-size)))
+                         (receive (ypdpy-g ypdpy-e)
+                             ;; Help me.
+                             (calc-ypdpy eval hiy qixhiy xhidhiy-all-g xhidhiy-all-e
+                                         xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                                         i1 j1)))))))))))))))
 
 (define (mph-nr reml? eval x y vg ve)
   (let* ((n-size (vec:length eval))
