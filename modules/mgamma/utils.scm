@@ -7,7 +7,7 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:export-syntax (dotimes with-cleanup)
+  #:export-syntax (dotimes dorange with-cleanup)
   #:export (2+
             vec-mean
             vec-replace-nan
@@ -25,6 +25,12 @@
   (syntax-rules ()
     ((_ (var upper-bound) body ...)
      (do ((var 0 (1+ var)))
+         ((= var upper-bound))
+       body ...))))
+(define-syntax dorange
+  (syntax-rules ()
+    ((_ (var lower-bound upper-bound) body ...)
+     (do ((var lower-bound (1+ var)))
          ((= var upper-bound))
        body ...))))
 
