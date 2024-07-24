@@ -838,7 +838,230 @@
         (mtx:free mat-g mat-e qimat-g qimat-e)))
     (values qimat-all-g qimat-all-e)))
 
-(define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian-inv)
+(define (calc-yhidhiy eval hiy i j)
+  "Calc_yHiDHiy"
+  (let* ((n-size (vec:length eval)))
+    (let calc ((k 0)
+               (yhidhiy-g 0)
+               (yhidhiy-e 0))
+      (if (= k n-size)
+          ;; Untested, might be too smart to actually work. --aartaka.
+          (values yhidhiy-g yhidhiy-e)
+          (let ((delta (vec:get eval k))
+                (d1 (mtx:get hiy i k))
+                (d2 (mtx:get hiy j k)))
+            (calc (1+ k)
+                  (+ yhidhiy-g (* delta d1 d2 (if (= i j) 1 2)))
+                  (+ yhidhiy-e (* d1 d2 (if (= i j) 1 2)))))))))
+
+(define (calc-ypdpy eval hiy qixhiy xhidhiy-all-g xhidhiy-all-e
+                    xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                    i j)
+  "Calc_yPDPy"
+  (let* ((d-size (mtx:rows hiy))
+         (v (getindex i j d-size)))
+    (receive (ypdpy-g ypdpy-e)
+        (calc-yhidhiy eval hiy i j)
+      (values
+       (+ ypdpy-g
+          (- (* 2 (mtx:with-column (xhidhiy-g xhidhiy-all-g v)
+                                   (blas:dot qixhiy xhidhiy-g))))
+          (mtx:with-column (xhidhixqixhiy-g xhidhixqixhiy-all-g v)
+                           (blas:dot qixhiy xhidhixqixhiy-g)))
+       (+ ypdpy-e
+          (- (* 2 (mtx:with-column (xhidhiy-e xhidhiy-all-e v)
+                                   (blas:dot qixhiy xhidhiy-e))))
+          (mtx:with-column (xhidhixqixhiy-e xhidhixqixhiy-all-e v)
+                           (blas:dot qixhiy xhidhixqixhiy-e)))))))
+
+(define (calc-tracehid eval hi i j)
+  (let ((n-size (vec:length eval))
+        (d-size (mtx:rows hi)))
+    (let calc ((k 0)
+               (thid-g 0)
+               (thid-e 0))
+      (if (= k n-size)
+          (values thid-g thid-e)
+          (let ((delta (vec:get eval k))
+                (d (mtx:get hi j (+ i (* k d-size)))))
+            (calc (1+ k)
+                  (+ thid-g (* delta d (if (= i j) 1 2)))
+                  (+ thid-e (* d (if (= i j) 1 2)))))))))
+
+(define (calc-tracepd eval qi hi xhidhix-all-g xhidhix-all-e i j)
+  (let* ((dc-size (mtx:rows qi))
+         (d-size (mtx:rows hi))
+         (v (getindex i j d-size)))
+    (receive (tpd-g tpd-e)
+        (calc-tracehid eval hi i j)
+      (dotimes (k dc-size)
+        (mtx:with-row
+         (qi-row qi k)
+         (mtx:with-column
+          (xhidhix-g-col xhidhix-all-g (+ k (* v dc-size)))
+          (mtx:with-column
+           (xhidhix-e-col xhidhix-all-e (+ k (* v dc-size)))
+           (set! tpd-g (- tpd-g (blas:ddot qi-row xhidhix-g-col)))
+           (set! tpd-e (- tpd-e (blas:ddot qi-row xhidhix-e-col)))))))
+      (values tpd-g tpd-e))))
+
+(define (calc-yhidhidhiy eval hi hiy i1 j1 i2 j2)
+  "Calc_yHiDHiDHiy"
+  (let* ((n-size (vec:length eval))
+         (d-size (mtx:rows hiy))
+         (yhidhidhiy-gg 0)
+         (yhidhidhiy-ee 0)
+         (yhidhidhiy-ge 0))
+    (dotimes (k n-size)
+      (let ((delta (vec:get eval k))
+            (d-hiy-i1 (mtx:get hiy i1 k))
+            (d-hiy-j1 (mtx:get hiy j1 k))
+            (d-hiy-i2 (mtx:get hiy i2 k))
+            (d-hiy-j2 (mtx:get hiy j2 k))
+            (d-hi-i1i2 (mtx:get hi i1 (+ i2 (* k d-size))))
+            (d-hi-i1j2 (mtx:get hi i1 (+ j2 (* k d-size))))
+            (d-hi-j1i2 (mtx:get hi j1 (+ i2 (* k d-size))))
+            (d-hi-j1j2 (mtx:get hi j1 (+ j2 (* k d-size)))))
+        (inc! yhidhidhiy-gg
+              (* delta delta (+ (* d-hiy-i1 d-hi-j1i2 d-hiy-j2)
+                                (if (= i1 j1)
+                                    0
+                                    (* d-hiy-j1 d-hi-i1i2 d-hiy-j2)))))
+        (inc! yhidhidhiy-ee
+              (+ (* d-hiy-i1 d-hi-j1j2 d-hiy-i2)
+                 (if (= i1 j1)
+                     0
+                     (* d-hiy-j1 d-hi-i1i2 d-hiy-j2))))
+        (inc! yhidhidhiy-ge
+              (* delta (+ (* d-hiy-i1 d-hi-j1i2 d-hiy-j2)
+                          (if (= i1 j1)
+                              0
+                              (* d-hiy-j1 d-hi-i1i2 d-hiy-j2)))))
+        (unless (= i2 j2)
+          (inc! yhidhidhiy-gg
+                (* delta delta (+ (* d-hiy-i1 d-hi-j1j2 d-hiy-i2)
+                                  (if (= i1 j1)
+                                      0
+                                      (* d-hiy-j1 d-hi-i1j2 d-hiy-i2)))))
+          (inc! yhidhidhiy-ee
+                (+ (* d-hiy-i1 d-hi-j1j2 d-hiy-i2)
+                   (if (= i1 j1)
+                       0
+                       (* d-hiy-j1 d-hi-i1j2 d-hiy-i2))))
+          (inc! yhidhidhiy-ee
+                (* delta (+ (* d-hiy-i1 d-hi-j1j2 d-hiy-i2)
+                            (if (= i1 j1)
+                                0
+                                (* d-hiy-j1 d-hi-i1j2 d-hiy-i2))))))))
+    (values yhidhidhiy-gg yhidhidhiy-ee yhidhidhiy-ge)))
+
+(define (calc-ypdpdpy eval hi xhi hiy qixhiy
+                      xhidhiy-all-g xhidhiy-all-e
+                      qixhidhiy-all-g qixhidhiy-all-e
+                      xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                      qixhidhixqixhiy-all-g qixhidhixqixhiy-all-e
+                      xhidhidhiy-all-gg xhidhidhiy-all-ee xhidhidhiy-all-ge
+                      xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                      i1 j1 i2 j2)
+  "Calc_yPDPDPy"
+  (let* ((d-size (mtx:rows hi))
+         (v-size (* d-size (1+ d-size) 1/2))
+         (dc-size (mtx:rows xhi))
+         (v1 (getindex i1 j1 d-size))
+         (v2 (getindex i2 j2 d-size)))
+    (vec:with
+     (xhidhidhixqixhiy dc-size)
+     (receive (ypdpdpy-gg ypdpdpy-ee ypdpdpy-ge)
+         (calc-yhidhidhiy eval hi hiy i1 j1 i2 j2)
+       (mtx:with-column
+        (xhidhidhiy-gg1 xhidhidhiy-all-gg (+ v2 (* v1 v-size)))
+        (mtx:with-column
+         (xhidhidhiy-ee1 xhidhidhiy-all-ee (+ v2 (* v1 v-size)))
+         (mtx:with-column
+          (xhidhidhiy-ge1 xhidhidhiy-all-ge (+ v2 (* v1 v-size)))
+          (mtx:with-column
+           (xhidhidhiy-gg2 xhidhidhiy-all-gg (+ v2 (* v1 v-size)))
+           (mtx:with-column
+            (xhidhidhiy-ee2 xhidhidhiy-all-ee (+ v2 (* v1 v-size)))
+            (mtx:with-column
+             (xhidhidhiy-ge2 xhidhidhiy-all-ge (+ v2 (* v1 v-size)))
+             (dec! ypdpdpy-gg (blas:dot qixhiy xhidhidhiy-gg1))
+             (dec! ypdpdpy-ee (blas:dot qixhiy xhidhidhiy-ee1))
+             (dec! ypdpdpy-ge (blas:dot qixhiy xhidhidhiy-ge1))
+             (dec! ypdpdpy-gg (blas:dot qixhiy xhidhidhiy-gg2))
+             (dec! ypdpdpy-ee (blas:dot qixhiy xhidhidhiy-ee2))
+             (dec! ypdpdpy-ge (blas:dot qixhiy xhidhidhiy-ge2))))))))
+       (mtx:with-column
+        (xhidhiy-g1 xhidhiy-all-g v1)
+        (mtx:with-column
+         (xhidhiy-e1 xhidhiy-all-e v1)
+         (mtx:with-column
+          (qixhidhiy-g2 qixhidhiy-all-g v2)
+          (mtx:with-column
+           (qixhidhiy-e2 qixhidhiy-all-e v2)
+           (dec! ypdpdpy-gg (blas:dot xhidhiy-g1 qixhidhiy-g2))
+           (dec! ypdpdpy-ee (blas:dot xhidhiy-e1 qixhidhiy-e2))
+           (dec! ypdpdpy-ge (blas:dot xhidhiy-g1 qixhidhiy-e2))
+           (mtx:with-column
+            (qixhidhiy-g1 qixhidhiy-all-g v1)
+            (mtx:with-column
+             (qixhidhiy-e1 qixhidhiy-all-e v1)
+             (mtx:with-column
+              (xhidhixqixhiy-g1 xhidhixqixhiy-all-g v1)
+              (mtx:with-column
+               (xhidhixqixhiy-e1 xhidhixqixhiy-all-e v1)
+               (mtx:with-column
+                (xhidhixqixhiy-g2 xhidhixqixhiy-all-g v2)
+                (mtx:with-column
+                 (xhidhixqixhiy-e2 xhidhixqixhiy-all-e v2)
+                 (inc! ypdpdpy-gg (blas:dot xhidhixqixhiy-g1 qixhidhiy-g2))
+                 (inc! ypdpdpy-gg (blas:dot xhidhixqixhiy-g2 qixhidhiy-g1))
+                 (inc! ypdpdpy-ee (blas:dot xhidhixqixhiy-e1 qixhidhiy-e2))
+                 (inc! ypdpdpy-ee (blas:dot xhidhixqixhiy-e2 qixhidhiy-e1))
+                 (inc! ypdpdpy-ge (blas:dot xhidhixqixhiy-g1 qixhidhiy-e2))
+                 (inc! ypdpdpy-ge (blas:dot xhidhixqixhiy-e2 qixhidhiy-g1))
+                 ;; Asks for with-submatrix...
+                 (let ((xhidhidhix-xx
+                        (submatrix
+                         xhidhidhix-all-gg
+                         0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size)))
+                   (blas:dgemv! xhidhidhix-xx qixhiy xhidhidhixqixhiy #:beta 0)
+                   (inc! ypdpdpy-gg (blas:dot xhidhidhixqixhiy qixhiy))
+                   (mtx:free xhidhidhix-xx)
+                   (set! xhidhidhix-xx
+                     (submatrix
+                      xhidhidhix-all-ee
+                      0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size))
+                   (blas:dgemv! xhidhidhix-xx qixhiy xhidhidhixqixhiy #:beta 0)
+                   (inc! ypdpdpy-ee (blas:dot xhidhidhixqixhiy qixhiy))
+                   (mtx:free xhidhidhix-xx)
+                   (set! xhidhidhix-xx
+                     (submatrix
+                      xhidhidhix-all-ge
+                      0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size))
+                   (blas:dgemv! xhidhidhix-xx qixhiy xhidhidhixqixhiy #:beta 0)
+                   (inc! ypdpdpy-ge (blas:dot xhidhidhixqixhiy qixhiy))
+                   (mtx:free xhidhidhix-xx)
+                   (mtx:with-column
+                    (qixhidhixqixhiy-g1 qixhidhixqixhiy-all-g v1)
+                    (mtx:with-column
+                     (qixhidhixqixhiy-e1 qixhidhixqixhiy-all-e v1)
+                     (dec! ypdpdpy-gg (blas:dot qixhidhixqixhiy-g1 xhidhixqixhiy-g2))
+                     (dec! ypdpdpy-ee (blas:dot qixhidhixqixhiy-e1 xhidhixqixhiy-e2))
+                     (dec! ypdpdpy-ge (blas:dot qixhidhixqixhiy-g1 xhidhixqixhiy-e2)))))))))))))))))))
+
+(define (calc-tracepdpd
+         eval qi hi xhi
+         qixhidhix-all-g qixhidhix-all-e
+         xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+         i1 j1 i2 j2)
+  
+  )
+(define (calc-tracehidhid eval hi i1 j1 i2 j2)
+  
+  )
+
+(define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian gradient)
   "CalcDev"
   (let* ((dc-size (mtx:rows qi))
          (d-size (mtx:rows hi))
@@ -868,7 +1091,54 @@
                              ;; Help me.
                              (calc-ypdpy eval hiy qixhiy xhidhiy-all-g xhidhiy-all-e
                                          xhidhixqixhiy-all-g xhidhixqixhiy-all-e
-                                         i1 j1)))))))))))))))
+                                         i1 j1)
+                           (receive (tx-g tx-e)
+                               (if reml?
+                                   (calc-tracepd eval qi hi xhidhix-all-g xhidhix-all-e i1 j1)
+                                   (calc-tracehid eval hi i1 j1))
+                             (vec:set! gradient v1 (+ (* -1/2 tx-g)
+                                                      (* 1/2 ypdpy-g)))
+                             (vec:set! gradient (+ v1 v-size) (+ (* -1/2 tx-e)
+                                                                 (* 1/2 ypdpy-e)))))
+                         (dotimes (i2 d-size)
+                           (dorange
+                            (j2 i2 d-size)
+                            (let ((v2 (getindex i2 j2 d-size)))
+                              (unless (< v2 v1)
+                                (receive (ypdpdpy-gg ypdpdpy-ee ypdpdpy-ge)
+                                    (calc-ypdpdpy eval hi xhi hiy qixhiy
+                                                  xhidhiy-all-g xhidhiy-all-e
+                                                  qixhidhiy-all-g qixhidhiy-all-e
+                                                  xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                                                  qixhidhixqixhiy-all-g qixhidhixqixhiy-all-e
+                                                  xhidhidhiy-all-gg xhidhidhiy-all-ee xhidhidhiy-all-ge
+                                                  xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                                  i1 j1 i2 j2)
+                                  (receive (txx-gg txx-ee txx-ge)
+                                      (if reml?
+                                          (calc-tracepdpd
+                                           eval qi hi xhi
+                                           qixhidhix-all-g qixhidhix-all-e
+                                           xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                           i1 j1 i2 j2)
+                                          (calc-tracehidhid eval hi i1 j1 i2 j2))
+                                    (let ((dev2-gg (- (* 1/2 txx-gg) ypdpdpy-gg))
+                                          (dev2-ee (- (* 1/2 txx-ee) ypdpdpy-ee))
+                                          (dev2-ge (- (* 1/2 txx-ge) ypdpdpy-ge)))
+                                      (mtx:set! hessian v1 v2 dev2-gg)
+                                      (mtx:set! hessian (+ v1 v-size) (+ v2 v-size) dev2-ee)
+                                      (mtx:set! hessian v1 (+ v2 v-size) dev2-ge)
+                                      (mtx:set! hessian (+ v2 v-size) v1 dev2-ge)
+                                      (unless (= v1 v2)
+                                        (mtx:set! hessian v2 v1 dev2-gg)
+                                        (mtx:set! hessian (+ v2 v-size) (+ v1 v-size) dev2-ee)
+                                        (mtx:set! hessian v2 (+ v1 v-size) dev2-ge)
+                                        (mtx:set! hessian (+ v1 v-size) v2 dev2-ge)))
+                                    (receive (lu pmt signum)
+                                        (linalg:decompose hessian)
+                                      (let ((hessian-inv (linalg:%invert hessian pmt)))
+                                        
+                                        (values hessian-inv crt-a crt-b crt-c))))))))))))))))))))))
 
 (define (mph-nr reml? eval x y vg ve)
   (let* ((n-size (vec:length eval))
@@ -906,7 +1176,7 @@
                 (let ((vg-save (mtx:copy! vg))
                       (ve-save (mtx:copy! ve))
                       ;; KLUDGE: have to store them here for use in
-                      ;; calc-deve down the line. Refactor it later
+                      ;; calc-dev down the line. Refactor it later
                       ;; --aartaka
                       (qi-save #f)
                       (hi-all-save #f)
@@ -968,9 +1238,12 @@
                    ((< (- logl-new logl-old) (nr-precision))
                     (break)))
                   (set! logl-old logl-new)
-                  (calc-dev
-                   reml? eval qi-save hi-all-save
-                   xhi-all-save hiy-all-save qixhiy-save hessian)))))))))))
+                  (receive (hessian-inv crt-a crt-b crt-c)
+                      (calc-dev
+                       reml? eval qi-save hi-all-save
+                       xhi-all-save hiy-all-save qixhiy-save hessian gradient)
+                    
+                    )))))))))))
 
 (define (mvlmm-analyze u eval utw uty)
   (let* ((n-size (mtx:rows uty))
