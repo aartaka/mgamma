@@ -7,7 +7,7 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:export-syntax (dotimes dorange with-cleanup)
+  #:export-syntax (inc! dotimes dorange with-cleanup)
   #:export (2+
             vec-mean
             vec-replace-nan
@@ -17,6 +17,13 @@
             eigendecomposition-zeroed
             submatrix
             submatrix->mtx!))
+
+(define-syntax inc!
+  (syntax-rules ()
+    ((_ var)
+     (set! var (1+ var)))
+    ((_ var step)
+     (set! var (+ step var)))))
 
 (define (2+ number)
   (+ number 2))
