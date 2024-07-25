@@ -180,3 +180,11 @@ and copying a ROWSxCOLS chunk."
            (mtx-col mtx-start-col (1+ mtx-col)))
           ((= col cols))
         (mtx:set! mtx mtx-row mtx-col (mtx:get submatrix row col))))))
+
+(define (subvector vec start len)
+  (let ((new (vec:alloc len)))
+    (do ((idx 0 (1+ idx))
+         (vec-idx start (1+ vec-idx)))
+        ((= idx len))
+      (vec:set! new idx (vec:get vec vec-idx)))
+    new))
