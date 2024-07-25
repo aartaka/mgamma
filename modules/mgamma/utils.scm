@@ -166,7 +166,8 @@ Return two values:
       (do ((col 0 (1+ col))
            (src-col start-col (1+ src-col)))
           ((= col cols))
-        (mtx:set! new row col (mtx:get mtx src-row src-col))))))
+        (mtx:set! new row col (mtx:get mtx src-row src-col))))
+    new))
 
 (define (submatrix->mtx! submatrix mtx mtx-start-row mtx-start-col rows cols)
   "Copy SUBMATRIX back into MXT starting on (mtx-start-row,mtx-start-col)
