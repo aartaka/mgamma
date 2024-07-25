@@ -444,15 +444,15 @@
                   (vec:scale! mat-row (/ 1 d))
                   (mtx:vec->row! mat-row mat-dd i))
                  (set! logdet-h (+ logdet-h (log d)))))
-             (let ((hi-k (blas:gemm ultvehi mat-dd #:transpose-a #t)))
-               ;; FIXME: is d-size always 2? hi-all only has 2 rows...
-               (dotimes (row d-size)
-                 (do ((hi-k-column 0 (1+ hi-k-column))
-                      (hi-all-column (* k d-size) (1+ hi-all-column)))
-                     ((= hi-all-column (* (1+ k) d-size)))
-                   (mtx:set! hi-all row hi-all-column
-                             (mtx:get hi-k row hi-k-column))))
-               (mtx:free hi-k))))
+             (with-gsl-free
+              ((hi-k (blas:gemm ultvehi mat-dd #:transpose-a #t)))
+              ;; FIXME: is d-size always 2? hi-all only has 2 rows...
+              (dotimes (row d-size)
+                (do ((hi-k-column 0 (1+ hi-k-column))
+                     (hi-all-column (* k d-size) (1+ hi-all-column)))
+                    ((= hi-all-column (* (1+ k) d-size)))
+                  (mtx:set! hi-all row hi-all-column
+                            (mtx:get hi-k row hi-k-column)))))))
          (receive (qi logdet-q)
              (calc-qi eval dl x)
            (mtx:free qi)
@@ -486,14 +486,14 @@
          (d-size (mtx:rows y))
          (hiy-all (mtx:calloc d-size n-size)))
     (dotimes (k n-size)
-      (let* ((hi-k (submatrix hi-all 0 (* k d-size) d-size d-size)))
+      (with-gsl-free
+       ((hi-k (submatrix hi-all 0 (* k d-size) d-size d-size)))
+       (mtx:with-column
+        (y-k y k)
         (mtx:with-column
-         (y-k y k)
-         (mtx:with-column
-          (hiy-k hiy-all k)
-          (blas:gemv! hi-k y-k hiy-k #:beta 0)
-          (mtx:vec->column! hiy-k hiy-all k)))
-        (mtx:free hi-k)))
+         (hiy-k hiy-all k)
+         (blas:gemv! hi-k y-k hiy-k #:beta 0)
+         (mtx:vec->column! hiy-k hiy-all k)))))
     hiy-all))
 
 (define (calc-xhi-all x hi-all)
@@ -522,11 +522,10 @@
          (dc-size (mtx:rows xhi-all))
          (xhiy (vec:calloc dc-size)))
     (dotimes (k n-size)
-      (let* ((xhi-k (submatrix xhi-all 0 (* k d-size) dc-size d-size))
-             (y-k (mtx:column->vec! y k)))
-        (blas:gemv! xhi-k y-k xhiy)
-        (mtx:free xhi-k)
-        (vec:free y-k)))
+      (with-gsl-free
+       ((xhi-k (submatrix xhi-all 0 (* k d-size) dc-size d-size))
+        (y-k (mtx:column->vec! y k)))
+       (blas:gemv! xhi-k y-k xhiy)))
     xhiy))
 
 (define (calc-yhiy y hiy-all)
@@ -578,7 +577,8 @@
              (calc-xhidhiy eval xhi hiy i j)
            (mtx:vec->column! xhidhiy-g xhidhiy-all-g v)
            (mtx:vec->column! xhidhiy-e xhidhiy-all-e v)
-           (vec:free xhidhiy-g xhidhiy-e)))))))
+           (vec:free xhidhiy-g xhidhiy-e)))))
+    (values xhidhiy-all-g xhidhiy-all-e)))
 
 (define (calc-xhidhix eval xhi i j)
   "Calc_xHiDHix"
@@ -586,26 +586,26 @@
          (n-size (vec:length eval))
          (d-size (/ (mtx:columns xhi) n-size))
          (xhidhix-g (mtx:calloc dc-size dc-size))
-         (xhidhix-e (mtx:calloc dc-size dc-size))
-         (mat-dcdc (mtx:alloc-square dc-size))
-         (mat-dcdc-t (mtx:alloc-square dc-size)))
-    (dotimes (k n-size)
-      (let ((delta (vec:get eval k)))
-        (mtx:with-column
-         (xhi-col-i xhi (+ i (* k d-size)))
+         (xhidhix-e (mtx:calloc dc-size dc-size)))
+    (with-gsl-free
+     ((mat-dcdc (mtx:alloc-square dc-size))
+      (mat-dcdc-t (mtx:alloc-square dc-size)))
+     (dotimes (k n-size)
+       (let ((delta (vec:get eval k)))
          (mtx:with-column
-          (xhi-col-j xhi (+ j (* k d-size)))
-          (mtx:fill! mat-dcdc 0)
-          (blas:ger! xhi-col-i xhi-col-i mat-dcdc)
-          (mtx:transpose! mat-dcdc mat-dcdc-t)
-          (mtx:add! xhidhix-e mat-dcdc)
-          (mtx:scale! mat-dcdc delta)
-          (mtx:add! xhidhix-e mat-dcdc)
-          (unless (= i j)
-            (mtx:add! xhidhix-e mat-dcdc-t)
-            (mtx:scale! mat-dcdc-t delta)
-            (mtx:add! xhidhix-g mat-dcdc-t))))))
-    (mtx:free mat-dcdc mat-dcdc-t)
+          (xhi-col-i xhi (+ i (* k d-size)))
+          (mtx:with-column
+           (xhi-col-j xhi (+ j (* k d-size)))
+           (mtx:fill! mat-dcdc 0)
+           (blas:ger! xhi-col-i xhi-col-i mat-dcdc)
+           (mtx:transpose! mat-dcdc mat-dcdc-t)
+           (mtx:add! xhidhix-e mat-dcdc)
+           (mtx:scale! mat-dcdc delta)
+           (mtx:add! xhidhix-e mat-dcdc)
+           (unless (= i j)
+             (mtx:add! xhidhix-e mat-dcdc-t)
+             (mtx:scale! mat-dcdc-t delta)
+             (mtx:add! xhidhix-g mat-dcdc-t)))))))
     (values xhidhix-g xhidhix-e)))
 
 (define (calc-xhidhix-all eval xhi)
@@ -815,11 +815,11 @@
        (vec-g vec-all-g i)
        (mtx:with-column
         (vec-e vec-all-e i)
-        (let ((quivec-g (blas:gemv qi vec-g))
-              (quivec-e (blas:gemv qi vec-e)))
-          (mtx:vec->column! quivec-g qivec-all-g i)
-          (mtx:vec->column! quivec-e qivec-all-e i)
-          (vec:free quivec-g quivec-e)))))))
+        (with-gsl-free
+         ((quivec-g (blas:gemv qi vec-g))
+          (quivec-e (blas:gemv qi vec-e)))
+         (mtx:vec->column! quivec-g qivec-all-g i)
+         (mtx:vec->column! quivec-e qivec-all-e i)))))))
 
 (define (calc-qimat-all qi mat-all-g mat-all-e)
   "Calc_QiMat_all"
@@ -829,13 +829,13 @@
          (qimat-all-g (mtx:alloc dc-size (* v-size dc-size)))
          (qimat-all-e (mtx:copy! qimat-all-g)))
     (dotimes (i v-size)
-      (let* ((mat-g (submatrix mat-all-g 0 (* i dc-size) dc-size dc-size))
-             (mat-e (submatrix mat-all-e 0 (* i dc-size) dc-size dc-size))
-             (qimat-g (blas:gemm qi mat-g))
-             (qimat-e (blas:gemm qi mat-e)))
-        (submatrix->mtx! qimat-g qimat-all-g 0 (* i dc-size) dc-size dc-size)
-        (submatrix->mtx! qimat-e qimat-all-e 0 (* i dc-size) dc-size dc-size)
-        (mtx:free mat-g mat-e qimat-g qimat-e)))
+      (with-gsl-free
+       ((mat-g (submatrix mat-all-g 0 (* i dc-size) dc-size dc-size))
+        (mat-e (submatrix mat-all-e 0 (* i dc-size) dc-size dc-size))
+        (qimat-g (blas:gemm qi mat-g))
+        (qimat-e (blas:gemm qi mat-e)))
+       (submatrix->mtx! qimat-g qimat-all-g 0 (* i dc-size) dc-size dc-size)
+       (submatrix->mtx! qimat-e qimat-all-e 0 (* i dc-size) dc-size dc-size)))
     (values qimat-all-g qimat-all-e)))
 
 (define (calc-yhidhiy eval hiy i j)
@@ -1050,16 +1050,220 @@
                      (dec! ypdpdpy-ee (blas:dot qixhidhixqixhiy-e1 xhidhixqixhiy-e2))
                      (dec! ypdpdpy-ge (blas:dot qixhidhixqixhiy-g1 xhidhixqixhiy-e2)))))))))))))))))))
 
+(define (calc-tracehidhid eval hi i1 j1 i2 j2)
+  "Calc_traceHiDHiD"
+  (let ((n-size (vec:length eval))
+        (d-size (mtx:rows hi))
+        (thidhid-gg 0)
+        (thidhid-ee 0)
+        (thidhid-ge 0))
+    (dotimes (k n-size)
+      (let ((delta (vec:get eval k))
+            (d-hi-i1i2 (mtx:get hi i1 (+ i2 (* k d-size))))
+            (d-hi-i1j2 (mtx:get hi i1 (+ j2 (* k d-size))))
+            (d-hi-j1i2 (mtx:get hi j1 (+ i2 (* k d-size))))
+            (d-hi-j1j2 (mtx:get hi j1 (+ j2 (* k d-size))))
+            (if/= (lambda (i j val)
+                    (if (= i j)
+                        0
+                        val))))
+        (inc! thidhid-gg
+              (* delta delta (+ (* d-hi-i1j2 d-hi-j1i2)
+                                (if/= i1 j1 (* d-hi-j1j2 d-hi-i1i2)))))
+        (inc! thidhid-ee
+              (+ (* d-hi-i1j2 d-hi-j1i2)
+                 (if/= i1 j1 (* d-hi-j1j2 d-hi-i1i2))))
+        (inc! thidhid-ge
+              (* delta (+ (* d-hi-i1j2 d-hi-j1i2)
+                          (if/= i1 j1 (* d-hi-j1j2 d-hi-i1i2)))))
+        (unless (= i2 j2)
+          (inc! thidhid-gg
+                (* delta delta (+ (* d-hi-i1i2 d-hi-j1j2)
+                                  (if/= i1 j1 (* d-hi-j1i2 d-hi-i1j2)))))
+          (inc! thidhid-ee
+                (+ (* d-hi-i1i2 d-hi-j1j2)
+                   (if/= i1 j1 (* d-hi-j1i2 d-hi-i1j2))))
+          (inc! thidhid-ge
+                (* delta (+ (* d-hi-i1i2 d-hi-j1j2)
+                            (if/= i1 j1 (* d-hi-j1i2 d-hi-i1j2))))))))
+    (values thidhid-gg thidhid-ee thidhid-ge)))
+
 (define (calc-tracepdpd
          eval qi hi xhi
          qixhidhix-all-g qixhidhix-all-e
          xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
          i1 j1 i2 j2)
-  
-  )
-(define (calc-tracehidhid eval hi i1 j1 i2 j2)
-  
-  )
+  "Calc_tracePDPD"
+  (let* ((dc-size (mtx:rows qi))
+         (d-size (mtx:rows hi))
+         (v-size (* d-size (1+ d-size) 1/2))
+         (v1 (getindex i1 j1 d-size))
+         (v2 (getindex i2 j2 d-size)))
+    (receive (tpdpd-gg tpdpd-ee tpdpd-ge)
+        (calc-tracehidhid eval hi i1 j1 i2 j2)
+      (dotimes (i dc-size)
+        (mtx:with-column
+         (qi-row qi i)
+         (mtx:with-column
+          (xhidhidhix-gg-col xhidhidhix-all-gg (+ i (* dc-size (+ v2 (* v1 v-size)))))
+          (mtx:with-column
+           (xhidhidhix-ee-col xhidhidhix-all-ee (+ i (* dc-size (+ v2 (* v1 v-size)))))
+           (mtx:with-column
+            (xhidhidhix-ge-col xhidhidhix-all-ge (+ i (* dc-size (+ v2 (* v1 v-size)))))
+            (dec! tpdpd-gg (blas:dot qi-row xhidhidhix-gg-col))
+            (dec! tpdpd-ee (blas:dot qi-row xhidhidhix-ee-col))
+            (dec! tpdpd-ge (blas:dot qi-row xhidhidhix-ge-col)))))))
+      (dotimes (i dc-size)
+        (mtx:with-row
+         (qixhidhix-g-fullrow1 qixhidhix-all-g i)
+         (mtx:with-row
+          (qixhidhix-e-fullrow1 qixhidhix-all-e i)
+          (let ((qixhidhix-g-row1 (subvector qixhidhix-g-fullrow1 (* v1 dc-size) dc-size))
+                (qixhidhix-e-row1 (subvector qixhidhix-e-fullrow1 (* v1 dc-size) dc-size)))
+            (mtx:with-column
+             (qixhidhix-g-col2 qixhidhix-all-g (+ i (* v2 dc-size)))
+             (mtx:with-column
+              (qixhidhix-e-col2 qixhidhix-all-e (+ i (* v2 dc-size)))
+              (inc! tpdpd-gg (blas:dot qixhidhix-g-row1 qixhidhix-g-col2))
+              (inc! tpdpd-ee (blas:dot qixhidhix-e-row1 qixhidhix-e-col2))
+              (inc! tpdpd-ge (blas:dot qixhidhix-g-row1 qixhidhix-e-col2))))))))
+      (values tpdpd-gg tpdpd-ee tpdpd-ge))))
+
+(define (calc-crt hessian-inv qi
+                  qixhidhix-all-g qixhidhix-all-e
+                  xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                  d-size)
+  "CalcCRT"
+  (let* ((dc-size (mtx:rows qi))
+         (c-size (/ dc-size d-size))
+         (v-size (/ (mtx:rows hessian-inv) 2))
+         (d-size (/ dc-size d-size))
+         (b 0)
+         (c 0)
+         (d 0))
+    (with-gsl-free
+     ((m-dd (mtx:alloc-square d-size))
+      (m-dcdc (mtx:alloc-square dc-size))
+      (qi-si (mtx:alloc-square d-size))
+      (qi-sub (mtx:alloc-square d-size))
+      (qi-s (submatrix qi (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size)))
+     (mtx:copy! qi-s qi-sub)
+     (receive (lu pmt signum)
+         (linalg:decompose qi-sub)
+       (linalg:%invert lu pmt qi-si)
+       (dotimes (v1 v-size)
+         (with-gsl-free
+          ((qim-g1 (submatrix qixhidhix-all-g 0 (* v1 dc-size) dc-size dc-size))
+           (qim-e1 (submatrix qixhidhix-all-e 0 (* v1 dc-size) dc-size dc-size))
+           (qimqi-g1 (blas:gem qim-g1 qi))
+           (qimqi-e1 (blas:gem qim-e1 qi))
+           (qimqi-g1-s (submatrix qimqi-g1 (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+           (qimqi-e1-s (submatrix qimqi-e1 (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+           (qimqisqisi-g1 (blas:gem qimqi-g1-s qi-si))
+           (qimqisqisi-e1 (blas:gem qimqi-e1-s qi-si)))
+          (let ((trc-g1 0)
+                (trc-e1 0)
+                (trc-g2 0)
+                (trc-e2 0)
+                (trcc-gg 0)
+                (trcc-ge 0)
+                (trcc-ee 0)
+                (trb-gg 0)
+                (trb-ge 0)
+                (trb-ee 0))
+            (dotimes (k d-size)
+              (dec! trc-g1 (mtx:get qimqisqisi-g1 k k)))
+            (dotimes (k d-size)
+              (dec! trc-e1 (mtx:get qimqisqisi-e1 k k)))
+            (dorange
+             (v2 v1 v-size)
+             (with-gsl-free
+              ((qim-g2 (submatrix qixhidhix-all-g 0 (* v2 dc-size) dc-size dc-size))
+               (qim-e2 (submatrix qixhidhix-all-e 0 (* v2 dc-size) dc-size dc-size))
+               (qimqi-g2 (blas:gem qim-g2 qi))
+               (qimqi-e2 (blas:gem qim-e2 qi))
+               (qimqi-g2-s (submatrix qimqi-g2 (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+               (qimqi-e2-s (submatrix qimqi-e2 (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+               (qimqisqisi-g2 (blas:gem qimqi-g2-s qi-si))
+               (qimqisqisi-e2 (blas:gem qimqi-e2-s qi-si)))
+              (dotimes (k d-size)
+                (dec! trc-g2 (mtx:get qimqisqisi-g2 k k)))
+              (dotimes (k d-size)
+                (dec! trc-e2 (mtx:get qimqisqisi-e2 k k)))
+              (blas:gem! qimqisqisi-g1 qimqisqisi-g2 m-dd #:beta 0)
+              (dotimes (k d-size)
+                (inc! trcc-gg (mtx:get m-dd k k)))
+              (blas:gem! qimqisqisi-g1 qimqisqisi-e2 m-dd #:beta 0)
+              (blas:gem! qimqisqisi-e1 qimqisqisi-g2 m-dd)
+              (dotimes (k d-size)
+                (inc! trcc-ge (mtx:get m-dd k k)))
+              (blas:gem! qimqisqisi-e1 qimqisqisi-e2 m-dd #:beta 0)
+              (dotimes (k d-size)
+                (inc! trcc-ee (mtx:get m-dd k k)))
+              (with-gsl-free
+               ((qimqimqi-gg (blas:gem qim-g1 qimqi-g2))
+                (qimqimqi-ge (blas:gem qim-g1 qimqi-e2))
+                ;; Rebinding to add one more matrix to it.
+                (qimqimqi-ge (begin
+                               (blas:gem! qim-e1 qimqi-g2 qimqimqi-ge)
+                               qimqimqi-ge))
+                (qimqimqi-ee (blas:gem qim-e1 qimqi-e2))
+                (qimqimqi-gg-s (submatrix qimqimqi-gg (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+                (qimqimqi-ge-s (submatrix qimqimqi-ge (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+                (qimqimqi-ee-s (submatrix qimqimqi-ee (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size)))
+               (blas:gem! qimqimqi-gg-s qi-si m-dd #:beta 0)
+               (dotimes (k d-size)
+                 (dec! trb-gg (mtx:get m-dd k k)))
+               (blas:gem! qimqimqi-ge-s qi-si m-dd #:beta 0)
+               (dotimes (k d-size)
+                 (dec! trb-ge (mtx:get m-dd k k)))
+               (blas:gem! qimqimqi-ee-s qi-si m-dd #:beta 0)
+               (dotimes (k d-size)
+                 (dec! trb-ee (mtx:get m-dd k k)))
+               (with-gsl-free
+                ((mm-gg (submatrix xhidhidhix-all-gg 0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size))
+                 (mm-ge (submatrix xhidhidhix-all-ge 0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size))
+                 (mm-ee (submatrix xhidhidhix-all-ge 0 (* dc-size (+ v2 (* v1 v-size))) dc-size dc-size))
+                 (qimmqi-gg (begin
+                              (blas:gem! qi mm-gg m-dcdc #:beta 0)
+                              (blas:gem m-dcdc qi)))
+                 (qimmqi-ge (begin
+                              (blas:gem! qi mm-ge m-dcdc #:beta 0)
+                              (blas:gem m-dcdc qi)))
+                 (qimmqi-ee (begin
+                              (blas:gem! qi mm-ee m-dcdc #:beta 0)
+                              (blas:gem m-dcdc qi)))
+                 (qimmqi-gg-s (submatrix qimmqi-gg (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+                 (qimmqi-ge-s (submatrix qimmqi-ge (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size))
+                 (qimmqi-ee-s (submatrix qimmqi-ee (* d-size (1- c-size)) (* d-size (1- c-size)) d-size d-size)))
+                (blas:gem! qimmqi-gg-s qi-si m-dd #:beta 0)
+                (dotimes (k d-size)
+                  (inc! trb-gg (mtx:get m-dd k k)))
+                (blas:gem! qimmqi-ge-s qi-si m-dd #:beta 0)
+                (dotimes (k d-size)
+                  (inc! trb-ge (mtx:get m-dd k k)))
+                (blas:gem! qimmqi-ee-s qi-si m-dd #:beta 0)
+                (dotimes (k d-size)
+                  (inc! trb-ee (mtx:get m-dd k k)))
+                (let ((trd-gg (* 2 trb-gg))
+                      (trd-ge (* 2 trb-ge))
+                      (trd-ee (* 2 trb-ee))
+                      (h-gg (* -1 (mtx:get hessian-inv v1 v2)))
+                      (h-ge (* -1 (mtx:get hessian-inv v1 (+ v2 v-size))))
+                      (h-ee (* -1 (mtx:get hessian-inv (+ v1 v-size) (+ v2 v-size)))))
+                  (inc! b (+ (* h-gg trb-gg)
+                             (* h-ge trb-ge)
+                             (* h-ee trb-ee)))
+                  (inc! c (+ (* h-gg (+ trcc-gg (* 1/2 trc-g1 trc-g2)))
+                             (* h-ge (+ trcc-ge (* 1/2 trc-g1 trc-e2) (* 1/2 trc-e1 trc-g2)))
+                             (* h-ee (+ trcc-ee (* 1/2 trc-e1 trc-e2)))))
+                  (inc! d (+ (* h-gg (+ trcc-gg (* 1/2 trd-gg)))
+                             (* h-ge (+ trcc-ge (* 1/2 trd-ge)))
+                             (* h-ee (+ trcc-ee (* 1/2 trd-ee)))))))))))))))
+    (let ((crt-a (- (* 2 d) c))
+          (crt-b (* 2 b))
+          (crt-c c))
+      (values crt-a crt-b crt-c))))
 
 (define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian gradient)
   "CalcDev"
@@ -1106,6 +1310,7 @@
                             (let ((v2 (getindex i2 j2 d-size)))
                               (unless (< v2 v1)
                                 (receive (ypdpdpy-gg ypdpdpy-ee ypdpdpy-ge)
+                                    ;; Psychic damage taken
                                     (calc-ypdpdpy eval hi xhi hiy qixhiy
                                                   xhidhiy-all-g xhidhiy-all-e
                                                   qixhidhiy-all-g qixhidhiy-all-e
@@ -1133,12 +1338,18 @@
                                         (mtx:set! hessian v2 v1 dev2-gg)
                                         (mtx:set! hessian (+ v2 v-size) (+ v1 v-size) dev2-ee)
                                         (mtx:set! hessian v2 (+ v1 v-size) dev2-ge)
-                                        (mtx:set! hessian (+ v1 v-size) v2 dev2-ge)))
-                                    (receive (lu pmt signum)
-                                        (linalg:decompose hessian)
-                                      (let ((hessian-inv (linalg:%invert hessian pmt)))
-                                        
-                                        (values hessian-inv crt-a crt-b crt-c))))))))))))))))))))))
+                                        (mtx:set! hessian (+ v1 v-size) v2 dev2-ge))))))))))))
+                    (receive (lu pmt signum)
+                        (linalg:decompose hessian)
+                      (let ((hessian-inv (linalg:%invert hessian pmt)))
+                        (receive (crt-a crt-b crt-c)
+                            (if (> c-size 1)
+                                (calc-crt hessian-inv qi
+                                          qixhidhix-all-g qixhidhix-all-g
+                                          xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                          d-size)
+                                (values 0 0 0))
+                          (values hessian-inv crt-a crt-b crt-c))))))))))))))
 
 (define (mph-nr reml? eval x y vg ve)
   (let* ((n-size (vec:length eval))
@@ -1242,8 +1453,8 @@
                       (calc-dev
                        reml? eval qi-save hi-all-save
                        xhi-all-save hiy-all-save qixhiy-save hessian gradient)
-                    
-                    )))))))))))
+                    (mtx:scale! hessian-inv -1)
+                    (values logl-new hessian-inv crt-a crt-b crt-c))))))))))))
 
 (define (mvlmm-analyze u eval utw uty)
   (let* ((n-size (mtx:rows uty))
@@ -1257,6 +1468,7 @@
         (mph-initial eval x y)
       (receive (vg ve logl-h0)
           (mph-em #t eval x y vg ve b)
-        (receive (hessian crt-a crt-b crt-c logl-h0)
+        ;; FIXME: Where is Hessian coming from?????      
+        (receive (logl-h0 hessian-inv crt-a crt-b crt-c)
             (mph-nr #t eval x y vg ve)
           #t)))))
