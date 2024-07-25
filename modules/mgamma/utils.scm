@@ -16,7 +16,8 @@
             eigendecomposition
             eigendecomposition-zeroed
             submatrix
-            submatrix->mtx!))
+            submatrix->mtx!
+            subvector))
 
 (define-syntax inc!
   (syntax-rules ()
