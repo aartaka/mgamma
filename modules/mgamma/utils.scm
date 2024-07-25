@@ -7,7 +7,7 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:export-syntax (inc! dec! dotimes dorange with-cleanup)
+  #:export-syntax (inc! dec! dotimes dorange with-cleanup with-gsl-free)
   #:export (2+
             vec-mean
             vec-replace-nan
@@ -188,3 +188,16 @@ and copying a ROWSxCOLS chunk."
         ((= idx len))
       (vec:set! new idx (vec:get vec vec-idx)))
     new))
+
+(define (gsl-free . things)
+  (for-each (lambda (thing)
+              (if (mtx:mtx? thing)
+                  (mtx:free thing)
+                  (vec:free thing)))
+            things))
+
+(define-syntax-rule (with-gsl-free ((var init) ...) body ...)
+  (let* ((var init) ...)
+    (with-cleanup
+     (begin body ...)
+     (gsl-free var ...))))
