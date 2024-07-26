@@ -17,7 +17,8 @@
             eigendecomposition-zeroed
             submatrix
             submatrix->mtx!
-            subvector))
+            subvector
+            subvector->vec!))
 
 (define-syntax inc!
   (syntax-rules ()
@@ -190,6 +191,11 @@ and copying a ROWSxCOLS chunk."
         ((= idx len))
       (vec:set! new idx (vec:get vec vec-idx)))
     new))
+(define (subvector->vec! sub vec start len)
+  (do ((idx 0 (1+ idx))
+       (vec-idx start))
+      ((= idx len))
+    (vec:set! vec vec-idx (vec:get sub idx))))
 
 (define (gsl-free . things)
   (for-each (lambda (thing)
