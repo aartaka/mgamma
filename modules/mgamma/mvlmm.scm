@@ -1464,6 +1464,64 @@
                     (set! crt-b-save crt-b)
                     (set! crt-c-save crt-c))))))))))))
 
+(define (mph-calc-beta eval w y vg ve)
+  (let* ((n-size (vec:length eval))
+         (c-size (mtx:rows w))
+         (d-size (mtx:rows vg))
+         (dc-size (* d-size c-size))
+         (b (mtx:alloc d-size (1+ c-size)))
+         (se-b (mtx:alloc d-size c-size)))
+    (with-gsl-free
+     ((beta (vec:alloc dc-size))
+      (v-beta (mtx:alloc-square dc-size)))
+     (receive (dl ultveh ultvehi)
+         (eigen-proc vg ve)
+       (with-gsl-free
+        ((ultvehiy (blas:gem ultvehi y))
+         (qi (calc-qi eval dl w))
+         (whiy (vec:alloc dc-size 0))
+         (qixhiy (vec:alloc dc-size))
+         (qiwhiy (blas:gemv qi whiy)))
+        (dotimes (i d-size)
+          (dotimes (j c-size)
+            (vec:set!
+             whiy
+             (+ i (* j d-size))
+             (let calc-d ((k 0)
+                          (d 0))
+               (if (= k n-size)
+                   d
+                   (calc-d (1+ k)
+                           (+ d
+                              (* (mtx:get ultvehiy i k)
+                                 (mtx:get w j k)
+                                 (/ 1 (1+ (* (vec:get eval k)
+                                             (vec:get dl i))))))))))))
+        (blas:gemv! qi whiy qiwhiy #:beta 0)
+        (dotimes (i c-size)
+          (with-gsl-free
+           ((qiwhiy-sub (subvector qiwhiy (* i d-size) d-size))
+            (beta-sub (blas:gem ultveh qiwhiy-sub)))
+           (dotimes (j c-size)
+             (with-gsl-free
+              ((qi-sub (submatrix qi (* i d-size) (* j d-size) d-size d-size))
+               (v-beta-sub (if (< j i)
+                               (with-gsl-free
+                                ((vbeta-sym (submatrix v-beta (* j d-size) (* i d-size) d-size d-size)))
+                                (mtx:transpose! vbeta-sym))
+                               (with-gsl-free
+                                ((qitemp-sub (blas:gemm qi-sub ultveh)))
+                                (blas:gemm ultveh qitemp-sub)))))
+              (submatrix->mtx! v-beta-sub v-beta (* j d-size) (* i d-size) d-size d-size)))
+           (subvector->vec! beta-sub beta (* i d-size) d-size)))
+        (dotimes (j (mtx:columns b))
+          (dotimes (i (mtx:rows b))
+            (mtx:set! b i j (vec:get beta (+ i (* j d-size))))
+            (mtx:set! se-b i j
+                      (sqrt (abs (mtx:get
+                                  v-beta (+ i (* j d-size)) (+ i (* j d-size))))))))
+        (values b se-b))))))
+
 (define (mvlmm-analyze u eval utw uty)
   (let* ((n-size (mtx:rows uty))
          (d-size (mtx:columns uty))
@@ -1475,8 +1533,18 @@
     (receive (vg ve b)
         (mph-initial eval x y)
       (receive (vg ve logl-h0)
-          (mph-em #t eval x y vg ve b)
-        ;; FIXME: Where is Hessian coming from?????      
+          (mph-em #:reml eval x y vg ve b)
         (receive (logl-h0 hessian-inv crt-a crt-b crt-c)
-            (mph-nr #t eval x y vg ve)
-          #t)))))
+            (mph-nr #:reml eval x y vg ve)
+          (with-gsl-free
+           ((x-sub (submatrix x 0 0 c-size n-size))
+            (b-sub (submatrix x 0 0 d-size c-size)))
+           (receive (b-sub se-b-null)
+               (mph-calc-beta eval x-sub y vg ve)
+             (receive (vg ve logl-h0)
+                 (mph-em #:reml eval x y vg ve b)
+               (receive (logl-h0 hessian-inv crt-a crt-b crt-c)
+                   (mph-nr #:reml eval x y vg ve)
+                 (receive (b-sub se-b-null)
+                     (mph-calc-beta eval x-sub y vg ve)
+                   #t))))))))))
