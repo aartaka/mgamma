@@ -89,6 +89,7 @@
       (values qi (linalg:%determinant-log q)))))
 
 (define (mph-initial eval x y)
+  "MphInitial"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
          (d-size (mtx:rows y))
@@ -135,12 +136,12 @@
                                (do ((i 0 (1+ i)))
                                    ((= i size))
                                  (vec:set! new i (vec:get beta (+ i offset))))))))
-           (do ((i 0 (1+ i)))
-               ((= i c-size))
-             (let* ((sub (sub-beta (* i d-size) d-size))
-                    (ultvehsub (blas:gemv ultveh sub)))
-               (mtx:vec->column! ultvehsub b i)
-               (vec:free sub ultvehsub))))
+            (do ((i 0 (1+ i)))
+                ((= i c-size))
+              (let* ((sub (sub-beta (* i d-size) d-size))
+                     (ultvehsub (blas:gemv ultveh sub)))
+                (mtx:vec->column! ultvehsub b i)
+                (vec:free sub ultvehsub))))
           (vec:free dl xhiy)
           (mtx:free ultveh ultvehi qi))))
     ;; TODO: Ensure everything is freed properly.
@@ -333,7 +334,8 @@
          (ultvehib (mtx:alloc d-size c-size))
          (ultvehibx (mtx:alloc d-size n-size))
          (ultvehiu (mtx:alloc d-size n-size))
-         (ultvehie (mtx:alloc d-size n-size)))
+         (ultvehie (mtx:alloc d-size n-size))
+         (ultvehiy (mtx:alloc d-size n-size)))
     (do ((i 0 (1+ i)))
         ((= i c-size))
       (do ((j 0 (1+ j)))
@@ -353,8 +355,8 @@
             (eigen-proc vg ve)
           (receive (qi logdet-q)
               (calc-qi eval dl x)
-            (let* ((ultvehiy (blas:gemm ultvehi y))
-                   (xhiy (calc-x-hi-y eval dl x ultvehiy)))
+            (blas:gemm! ultvehi y ultvehiy #:beta 0)
+            (let* ((xhiy (calc-x-hi-y eval dl x ultvehiy)))
               (set! logl-new
                 (+ logl-const
                    (mph-calc-logl eval xhiy dl ultvehiy qi)
@@ -386,7 +388,7 @@
                     (mtx:free ultveh ultvehi ultvehiy qi
                               omega-u omega-e u-hat e-hat b sigma-uu sigma-uu)
                     (vec:free dl xhiy))))))))
-      (mtx:free xxt xxti ultvehib ultvehibx ultvehiu ultvehie)
+      (mtx:free xxt xxti ultvehib ultvehibx ultvehiu ultvehie ultvehiy)
       (values vg ve logl-new))))
 
 (define (getindex i j d-size)
@@ -1265,12 +1267,13 @@
           (crt-c c))
       (values crt-a crt-b crt-c))))
 
-(define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian gradient)
+(define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian-inv gradient)
   "CalcDev"
   (let* ((dc-size (mtx:rows qi))
          (d-size (mtx:rows hi))
          (c-size (dc-size d-size))
-         (v-size (* d-size (1+ d-size) 1/2)))
+         (v-size (* d-size (1+ d-size) 1/2))
+         (hessian (mtx:alloc-square (* 2 v-size))))
     (receive (xhidhiy-all-g xhidhiy-all-e)
         (calc-xhidhiy-all eval xhi hiy)
       (receive (xhidhix-all-g xhidhix-all-e)
@@ -1341,15 +1344,15 @@
                                         (mtx:set! hessian (+ v1 v-size) v2 dev2-ge))))))))))))
                     (receive (lu pmt signum)
                         (linalg:decompose hessian)
-                      (let ((hessian-inv (linalg:%invert hessian pmt)))
-                        (receive (crt-a crt-b crt-c)
-                            (if (> c-size 1)
-                                (calc-crt hessian-inv qi
-                                          qixhidhix-all-g qixhidhix-all-g
-                                          xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
-                                          d-size)
-                                (values 0 0 0))
-                          (values hessian-inv crt-a crt-b crt-c))))))))))))))
+                      (linalg:%invert hessian pmt hessian-inv)
+                      (receive (crt-a crt-b crt-c)
+                          (if (> c-size 1)
+                              (calc-crt hessian-inv qi
+                                        qixhidhix-all-g qixhidhix-all-g
+                                        xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                        d-size)
+                              (values 0 0 0))
+                        (values hessian-inv crt-a crt-b crt-c)))))))))))))
 
 (define (mph-nr reml? eval x y vg ve)
   (let* ((n-size (vec:length eval))
@@ -1358,8 +1361,7 @@
          (dc-size (* d-size c-size))
          (v-size (* d-size (1+ d-size) 1/2))
          (xxt (blas:syrk x))
-         (hessian (mtx:alloc-square (* 2 v-size)))
-         (gradient (vec:alloc (* 2 v-size))))
+         (hessian-inv (mtx:alloc-square (* 2 v-size))))
     (dotimes (i c-size)
       (dotimes (j i)
         (mtx:set! xxt i j (mtx:get xxt j i))))
@@ -1374,11 +1376,15 @@
                   (* -1/2 n-size d-size (log (* 2 +pi+)))))
              (logl-new 0)
              (logl-old 0)
+             (crt-a-save 0)
+             (crt-b-save 0)
+             (crt-c-save 0)
              (positive-definite? #t))
          (call-with-current-continuation
           (lambda (break)
             ;; TODO: `nr-precision' checks
-            (dotimes (t (nr-iter))
+            (dotimes (t (nr-iter)
+                        (values hessian-inv crt-a-save crt-b-save crt-c-save logl-new))
               (unless (and (positive? t)
                            (or (< logl-new logl-old)
                                (not positive-definite?)
@@ -1406,8 +1412,8 @@
                                  (positive? t))))
                     (mtx:copy! vg-save vg)
                     (mtx:copy! ve-save ve)
-                    (unless (zero? t)
-                      (update-vg-ve hessian gradient scale vg ve))
+                    (when (positive? t)
+                      (update-vg-ve hessian-inv gradient scale vg ve))
                     (let ((check-definite
                            (lambda (mtx)
                              (mtx:with
@@ -1445,16 +1451,18 @@
                              (not positive-definite?)))
                     (mtx:copy! vg-save vg)
                     (mtx:copy! vg-save ve)
-                    (break))
+                    (break hessian-inv crt-a-save crt-b-save crt-c-save logl-new))
                    ((< (- logl-new logl-old) (nr-precision))
-                    (break)))
+                    (break hessian-inv crt-a-save crt-b-save crt-c-save logl-new)))
                   (set! logl-old logl-new)
                   (receive (hessian-inv crt-a crt-b crt-c)
                       (calc-dev
                        reml? eval qi-save hi-all-save
-                       xhi-all-save hiy-all-save qixhiy-save hessian gradient)
+                       xhi-all-save hiy-all-save qixhiy-save hessian-inv gradient)
                     (mtx:scale! hessian-inv -1)
-                    (values logl-new hessian-inv crt-a crt-b crt-c))))))))))))
+                    (set! crt-a-save crt-a)
+                    (set! crt-b-save crt-b)
+                    (set! crt-c-save crt-c))))))))))))
 
 (define (mvlmm-analyze u eval utw uty)
   (let* ((n-size (mtx:rows uty))
