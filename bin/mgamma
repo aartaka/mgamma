@@ -132,7 +132,7 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(mdb|txt) --pheno p
     (cond
      (help
       (format #t "Run a linear mixed model on genotype data:
-mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(mdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
+mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] [--pheno-nums X,Y,Z] --geno geno.(mdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
      (else
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
