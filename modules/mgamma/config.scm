@@ -19,7 +19,7 @@
 (define em-precision (make-parameter 0.0001))
 (define nr-iter (make-parameter 100))
 (define nr-precision (make-parameter 0.0001))
-(define crt (make-parameter 0))
+(define crt (make-parameter #f))
 
 ;; Defining π here (as the largest precision fraction from Wikipedia),
 ;; because I haven't found it in Guile standard lib (at least in
