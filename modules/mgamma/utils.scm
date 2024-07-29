@@ -18,7 +18,8 @@
             submatrix
             submatrix->mtx!
             subvector
-            subvector->vec!))
+            subvector->vec!
+            gsl-free))
 
 (define-syntax inc!
   (syntax-rules ()
