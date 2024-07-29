@@ -4,6 +4,7 @@
   #:use-module (mgamma useful)
   #:use-module (mgamma utils)
   #:use-module (mgamma lmm)
+  #:use-module (mgamma mvlmm)
   #:use-module (rnrs base)
   #:use-module (srfi srfi-1)
   #:use-module (srfi srfi-8)
@@ -124,7 +125,8 @@ be zero-based."
              (y-col (mtx:column->vec! y 0))
              (uty-col (mtx:column->vec! uty 0)))
         (if (= 1 n-phenotypes)
-            (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty-col n-covariates))))))
+            (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty-col n-covariates)
+            (mvlmm-analyze markers useful-geno u eval utw uty))))))
 
 ;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
 ;; (define geno-mtx (first geno))
