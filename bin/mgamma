@@ -96,7 +96,7 @@ kinship lmdb -> txt     [--map-size 10000000] --kinship data.mdb --output kinshi
     (cond
      (help
       (format #t "Compute kinship matrix based on the genotype and phenotype files:
-mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%"))
+mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(mdb|txt) --pheno pheno.txt --output kinship.(txt|mdb)~%"))
      (else
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
@@ -132,7 +132,7 @@ mgamma kinship [--maf 0.1] [--map-size 10000000] --geno geno.(lmdb|txt) --pheno 
     (cond
      (help
       (format #t "Run a linear mixed model on genotype data:
-mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(lmdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
+mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] --geno geno.(mdb|txt) --pheno pheno.txt --covar covar.txt --output assoc.txt~%"))
      (else
       (let ((map-size (option-ref options 'map-size #f)))
         (when map-size
