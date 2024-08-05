@@ -86,9 +86,8 @@ Use KINSHIP, EIGENVECTORS , PHENO, and CVT (all matrices) for
 computations, but mostly clean them up into new ones and use those.
 KINSHIP is computed from GENO when #f.
 EIGENVECTORS are computed from KINSHIP when #f.
-In case PHENO-NUMS is a non-empty non-false list of numbers, run
-multivariate LMM on the data instead of univariate. PHENO-NUMS should
-be zero-based."
+In case PHENO-NUMS is a non-empty non-false list of zero-based
+numbers, run multivariate LMM on the data instead of univariate."
   (let* ((useful-individuals (useful-individuals pheno cvt))
          (useful-geno (useful-geno-mtx geno useful-individuals))
          (useful-pheno (useful-pheno-mtx pheno useful-individuals pheno-nums))
