@@ -52,28 +52,20 @@ Return a list of strings in between these separators."
         '())))))
 
 ;; For speed.
-(define %read-separated-lines-cache (make-hash-table))
 (define (read-separated-lines file)
   "Read tab/space/comma-separated fields from FILE.
 Return a list of lists of values.
 Necessary because the biological data often comes in BIMBAM format, a
 frivolous mix of tab and comma separated values."
-  (if (hash-ref %read-separated-lines-cache file)
-      (hash-ref %read-separated-lines-cache file)
-      (begin
-        (hash-set!
-         %read-separated-lines-cache
-         file
-         (call-with-port (open-input-file file)
-           (lambda (port)
-             (remove
-              null?
-              (let read-lines ((line (first (%read-line port))))
-                (if (eof-object? line)
-                    '()
-                    (cons (string-separate line)
-                          (read-lines (first (%read-line port))))))))))
-        (hash-ref %read-separated-lines-cache file))))
+  (call-with-port (open-input-file file)
+    (lambda (port)
+      (remove
+       null?
+       (let read-lines ((line (first (%read-line port))))
+         (if (eof-object? line)
+             '()
+             (cons (string-separate line)
+                   (read-lines (first (%read-line port))))))))))
 
 ;; (first (read-separated-lines "/home/aartaka/git/GEMMA/example/mouse_hs1940.geno.txt"))
 
