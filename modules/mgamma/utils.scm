@@ -136,21 +136,21 @@ Also subtract mean from all the values to 'center' them."
      (make-c-struct
       (make-list (* 2 (mtx:rows kinship)) int)
       (make-list (* 2 (mtx:rows kinship)) 0)))
-    (values evalues-vec evectors-mtx)))
+    (values evalues-vec evectors-mtx kinship)))
 
 (define (eigendecomposition-zeroed kinship)
   "Eigendecomposition, but zero the values below threshold.
 Return two values:
 - EVALUES-VEC
 - EVECTORS-MTX"
-  (receive (evalues-vec evectors-mtx)
+  (receive (evalues-vec evectors-mtx residuals-mtx)
       (eigendecomposition kinship)
     (do ((i 0 (1+ i)))
         ((= i (vec:length evalues-vec)))
       (when (< (abs (vec:get evalues-vec i)) 1e-10)
         ;; pylmm uses 1e-6 instead
         (vec:set! evalues-vec i 0)))
-    (values evalues-vec evectors-mtx)))
+    (values evalues-vec evectors-mtx residuals-mtx)))
 
 (define-syntax-rule (with-cleanup form cleanup ...)
   (dynamic-wind
