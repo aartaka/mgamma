@@ -1553,6 +1553,8 @@
         (qiwhix (mtx:alloc dc-size d-size)))
        (dotimes (i d-size)
          (receive (d1 d2)
+             ;; Yes, this is an ugly one. But do would be equally
+             ;; ugly. --aartaka
              (let xp*calc ((k 0)
                            (d1 0)
                            (d2 0))
