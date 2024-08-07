@@ -110,7 +110,7 @@
       (receive (lam logl-h0)
           (calc-lambda-null xt y-row-tmp eval)
         (receive (g e b)
-            (calc-vg-ve-beta eval xt y-row-tmp lam)
+            (calc-vg-ve-beta lam eval xt y-row-tmp)
           (mtx:set! vg i i g)
           (mtx:set! ve i i e))))
     ;; FIXME: Ignoring the d-size > 4 case for now
