@@ -23,7 +23,7 @@
      (mtx:with
       (ve-hi d-size d-size 0)
       (let ((logdet-ve 0))
-        (receive (ul dl residuals-mtx)
+        (receive (ul dl)
             (eigendecomposition-zeroed ve-temp)
           (do ((i 0 (1+ i)))
               ((= i d-size))
@@ -46,7 +46,7 @@
           (vec:free dl))
         (let* ((vg-ve-hi (blas:gemm vg ve-hi))
                (lam (blas:gemm ve-hi vg-ve-hi)))
-          (receive (ul dl residuals)
+          (receive (ul dl)
               (eigendecomposition-zeroed lam)
             (vec:for-each
              (lambda (idx val)
@@ -55,7 +55,7 @@
              dl)
             (let ((ultveh (blas:gemm ul ve-h #:transpose-a #t))
                   (ultvehi (blas:gemm ul ve-hi #:transpose-a #t)))
-              (values dl ultveh ultvehi residuals-mtx logdet-ve)))))))))
+              (values dl ultveh ultvehi logdet-ve)))))))))
 
 (define (calc-qi eval dl x)
   "CalcQi"
@@ -355,7 +355,7 @@
           (logl-new #f))
       ;; TODO: Precision check
       (dotimes (t (em-iter))
-        (receive (dl ultveh ultvehi residuals-mtx logdet-ve)
+        (receive (dl ultveh ultvehi logdet-ve)
             (eigen-proc vg ve)
           (receive (qi logdet-q)
               (calc-qi eval dl x)
@@ -436,7 +436,7 @@
          (qi (mtx:calloc dc-size dc-size)))
     (mtx:with
      (mat-dd d-size d-size)
-     (receive (dl ultveh ultvehi residuals-mtx logdet-ve)
+     (receive (dl ultveh ultvehi logdet-ve)
          (eigen-proc vg ve)
        (let ((logdet-h (* n-size logdet-ve)))
          (dotimes (k n-size)
