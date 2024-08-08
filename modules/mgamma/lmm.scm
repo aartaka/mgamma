@@ -606,7 +606,7 @@ Return (LAMBDA LOGF) values."
          (vec:multiply! hiw-col-tmp hi-eval)
          (mtx:vec->column! hiw-col-tmp hiw i)))
       (let ((whiw (blas:gemm hiw utw #:transpose-a #t))
-            (whiy (blas:gemv hiw uty-col))
+            (whiy (blas:gemv hiw uty-col #:transpose #t))
             (pab (mtx:alloc (2+ n-covariates) n-index)))
         (calc-pab! uab pab hi-eval n-covariates)
         (receive (lu perms signum)
