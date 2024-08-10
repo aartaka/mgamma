@@ -37,7 +37,7 @@
                       reason))))
      (display error-text)
      (newline)
-     (error 'gsl error-text))))
+     (apply error 'gsl error-text rest))))
 
 (define (kinship-mtx geno-mtx markers useful-snps)
   "Calculate the kinship matrix for GENO-MTX.
