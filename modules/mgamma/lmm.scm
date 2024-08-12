@@ -549,13 +549,9 @@ Return (LAMBDA LOGF) values."
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates))
          (uab (calc-uab-null utw uty-col)))
-    (dynamic-wind
-      (lambda ()
-        #t)
-      (lambda ()
-        (calc-lambda #t n-inds n-covariates uab eval))
-      (lambda ()
-        (mtx:free uab)))))
+    (with-cleanup
+     (calc-lambda #t n-inds n-covariates uab eval)
+     (mtx:free uab))))
 
 (define (calc-rlwald l n-inds n-covariates uab eval)
   "Calculate (BETA SE P-WALD) for a given UAB and Lambda."
