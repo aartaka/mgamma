@@ -7,7 +7,10 @@
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
-  #:export-syntax (inc! dec! dotimes dorange with-cleanup with-gsl-free)
+  #:export-syntax (inc! dec!
+                        dotimes dorange
+                        with-cleanup with-gsl-free
+                        define-parameterized)
   #:export (2+
             vec-mean
             vec-replace-nan
@@ -211,3 +214,24 @@ and copying a ROWSxCOLS chunk."
     (with-cleanup
      (begin body ...)
      (gsl-free var ...))))
+
+
+;; Define a NAMEd procedure and PARAMETER-NAMEd parameter
+;; variable. Proceeds with running BODY with ARGS when PARAMETER-NAMEd
+;; variable is #false. When PARAMETER-NAME is `parameterize'd to a new
+;; procedure, call this procedure on ARGS instead. Useful to override
+;; a procedure (like replacing the results for testing or providing
+;; shortcut data for long-running computation.)
+(define-syntax define-parameterized
+  (syntax-rules ()
+    ((_ ((name parameter-name) . args) body ...)
+     (begin
+       (define parameter-name (make-parameter #f))
+       (define (name . rest)
+         (apply (or (parameter-name)
+                    (lambda args body ...))
+                rest))))
+    ((_ (name . args) body ...)
+     (define (name . args) body ...))
+    ((_ name value)
+     (define name (make-parameter value)))))
