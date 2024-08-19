@@ -40,8 +40,9 @@
 (define-syntax dotimes
   (syntax-rules ()
     ((_ (var upper-bound . result-forms) body ...)
-     (do ((var 0 (1+ var)))
-         ((= var upper-bound)
+     (do ((var 0 (1+ var))
+          (bound upper-bound))
+         ((= var bound)
           . result-forms)
        body ...))))
 (define-syntax dorange
