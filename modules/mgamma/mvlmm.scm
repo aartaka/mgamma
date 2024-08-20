@@ -1412,7 +1412,7 @@
                            (lambda (mtx)
                              (mtx:with
                               (v-temp (mtx:rows ve) (mtx:columns ve) mtx)
-                              (receive (u-temp d-temp)
+                              (receive (d-temp u-temp)
                                   (eigendecomposition v-temp)
                                 (dotimes (i d-size)
                                   (unless (positive? (vec:get d-temp i))
