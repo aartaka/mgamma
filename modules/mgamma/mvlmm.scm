@@ -379,8 +379,8 @@
                   (receive (sigma-uu sigma-ee)
                       (calc-sigma reml? eval dl x omega-u omega-e ultveh qi)
                     (update-v eval u-hat sigma-uu sigma-ee vg ve)
-                    (mtx:free ultveh ultvehi ultvehiy qi
-                              omega-u omega-e u-hat e-hat b sigma-uu sigma-uu)
+                    (mtx:free ultveh ultvehi qi
+                              omega-u omega-e u-hat e-hat b sigma-uu sigma-ee)
                     (vec:free dl xhiy))))))))
       (mtx:free xxt xxti ultvehib ultvehibx ultvehiu ultvehie ultvehiy)
       (values vg ve logl-new))))
