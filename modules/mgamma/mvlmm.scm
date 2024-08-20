@@ -1687,4 +1687,5 @@
                                                            0 ;; p-score
                                                            (reverse! v-vg)
                                                            (reverse! v-ve)
-                                                           (reverse! v-vbeta)))))))))))))))))))))))))
+                                                           (reverse! v-vbeta)))))))))))))))))))))))
+    per-snp-params))
