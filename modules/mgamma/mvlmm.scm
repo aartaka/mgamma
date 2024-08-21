@@ -14,7 +14,7 @@
   #:use-module ((gsl linear-algebra) #:prefix linalg:)
   #:export (mvlmm-analyze))
 
-(define (eigen-proc vg ve)
+(define-parameterized (eigen-proc vg ve)
   "EigenProc"
   (let ((d-size (mtx:rows vg))
         (ve-temp (mtx:copy! ve)))
@@ -57,7 +57,7 @@
                   (ultvehi (blas:gemm ul ve-hi #:transpose-a #t)))
               (values dl ultveh ultvehi logdet-ve)))))))))
 
-(define (calc-qi eval dl x)
+(define-parameterized (calc-qi eval dl x)
   "CalcQi"
   (let* ((n-size (vec:length eval))
          (d-size (vec:length dl))
@@ -85,7 +85,7 @@
       ;; FIXME: Leaks PERMS.
       (values qi (linalg:%determinant-log q)))))
 
-(define (mph-initial eval x y)
+(define-parameterized ((mph-initial %mph-initial) eval x y)
   "MphInitial"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
@@ -139,7 +139,7 @@
     ;; TODO: Ensure everything is freed properly.
     (values vg ve b-sub)))
 
-(define (calc-x-hi-y eval dl x ultvehiy)
+(define-parameterized (calc-x-hi-y eval dl x ultvehiy)
   "CalcXHiY"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
@@ -162,7 +162,7 @@
                                  (1+ (* dl (vec:get eval k))))))))))))
     xhiy))
 
-(define (mph-calc-logl eval xhiy dl ultvehiy qi)
+(define-parameterized (mph-calc-logl eval xhiy dl ultvehiy qi)
   (let ((n-size (vec:length eval))
         (d-size (vec:length dl))
         (dc-size (mtx:rows qi))
@@ -182,7 +182,7 @@
       (vec:free qiv)
       (* -1/2 (- logl d)))))
 
-(define (calc-omega eval dl)
+(define-parameterized (calc-omega eval dl)
   "CalcOmega"
   (let* ((n-size (vec:length eval))
          (d-size (vec:length dl))
@@ -200,7 +200,7 @@
             (mtx:set! omega-e i k de)))))
     (values omega-u omega-e)))
 
-(define (update-rl-b xhiy qi ultvehib)
+(define-parameterized (update-rl-b xhiy qi ultvehib)
   "UpdateRL_B"
   (let* ((d-size (mtx:rows ultvehib))
          (c-size (mtx:columns ultvehib))
@@ -247,7 +247,7 @@
      (blas:gemm! yux xxti ultvehib #:beta 0)
      ultvehib)))
 
-(define (calc-sigma reml? eval dl x omega-u omega-e ultveh qi)
+(define-parameterized (calc-sigma reml? eval dl x omega-u omega-e ultveh qi)
   "CalcSigma"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
@@ -317,7 +317,7 @@
     (mtx:scale! vg (/ 1 n-size))
     (mtx:scale! ve (/ 1 n-size))))
 
-(define (mph-em reml? eval x y vg ve b)
+(define-parameterized ((mph-em %mph-em) reml? eval x y vg ve b)
   "MphEM"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
@@ -408,15 +408,15 @@
      (blas:gemv! hessian gradient vec-v #:alpha (* -1 scale))
      (dotimes (i d-size)
        (dorange (j i d-size)
-         (let* ((v (getindex i j d-size))
-                (dg (vec:get vec-v v))
-                (de (vec:get vec-v (+ v v-size))))
-           (mtx:set! vg i j dg)
-           (mtx:set! vg j i dg)
-           (mtx:set! ve i j de)
-           (mtx:set! ve j i de)))))))
+                (let* ((v (getindex i j d-size))
+                       (dg (vec:get vec-v v))
+                       (de (vec:get vec-v (+ v v-size))))
+                  (mtx:set! vg i j dg)
+                  (mtx:set! vg j i dg)
+                  (mtx:set! ve i j de)
+                  (mtx:set! ve j i de)))))))
 
-(define (calc-hi-qi eval x vg ve)
+(define-parameterized (calc-hi-qi eval x vg ve)
   "CalcHiQi"
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
@@ -476,7 +476,7 @@
              (vec:free dl)
              (values hi-all qi logdet-h logdet-q))))))))
 
-(define (calc-hiy-all y hi-all)
+(define-parameterized (calc-hiy-all y hi-all)
   "Calc_Hiy_all"
   (let* ((n-size (mtx:columns y))
          (d-size (mtx:rows y))
@@ -492,7 +492,7 @@
          (mtx:vec->column! hiy-k hiy-all k)))))
     hiy-all))
 
-(define (calc-xhi-all x hi-all)
+(define-parameterized (calc-xhi-all x hi-all)
   "Calc_xHi_all"
   (let* ((n-size (mtx:columns x))
          (c-size (mtx:rows x))
@@ -511,7 +511,7 @@
                              (* i d-size) (* k d-size) d-size d-size)))))
     xhi-all))
 
-(define (calc-xhiy y xhi-all)
+(define-parameterized (calc-xhiy y xhi-all)
   "Calc_xHiy"
   (let* ((n-size (mtx:columns y))
          (d-size (mtx:rows y))
@@ -524,7 +524,7 @@
        (blas:gemv! xhi-k y-k xhiy)))
     xhiy))
 
-(define (calc-yhiy y hiy-all)
+(define-parameterized (calc-yhiy y hiy-all)
   "Calc_yHiy"
   (let ((n-size (mtx:columns y))
         (yhiy 0))
@@ -536,7 +536,7 @@
         (set! yhiy (+ yhiy (blas:dot hiy-k y-k))))))
     yhiy))
 
-(define (calc-xhidhiy eval xhi hiy i j)
+(define-parameterized (calc-xhidhiy eval xhi hiy i j)
   "Calc_xHiDHiy"
   (let* ((dc-size (mtx:rows xhi))
          (n-size (vec:length eval))
@@ -558,7 +558,7 @@
               (blas:daxpy! d xhi-col-j xhidhiy-e)))))))
     (values xhidhiy-g xhidhiy-e)))
 
-(define (calc-xhidhiy-all eval xhi hiy)
+(define-parameterized (calc-xhidhiy-all eval xhi hiy)
   "Calc_xHiDHiy_all"
   (let* ((d-size (mtx:rows hiy))
          (dc-size (mtx:rows xhi))
@@ -576,7 +576,7 @@
            (vec:free xhidhiy-g xhidhiy-e)))))
     (values xhidhiy-all-g xhidhiy-all-e)))
 
-(define (calc-xhidhix eval xhi i j)
+(define-parameterized (calc-xhidhix eval xhi i j)
   "Calc_xHiDHix"
   (let* ((dc-size (mtx:rows xhi))
          (n-size (vec:length eval))
@@ -604,7 +604,7 @@
              (mtx:add! xhidhix-g mat-dcdc-t)))))))
     (values xhidhix-g xhidhix-e)))
 
-(define (calc-xhidhix-all eval xhi)
+(define-parameterized (calc-xhidhix-all eval xhi)
   "Calc_xHiDHix_all"
   (let* ((n-size (vec:length eval))
          (d-size (/ (mtx:columns xhi)
@@ -628,7 +628,7 @@
            (mtx:free xhidhix-g xhidhix-e)))))
     (values xhidhix-all-g xhidhix-all-e)))
 
-(define (calc-xhidhixqixhiy-all xhidhix-all-g xhidhix-all-e qixhiy)
+(define-parameterized (calc-xhidhixqixhiy-all xhidhix-all-g xhidhix-all-e qixhiy)
   "Calc_xHiDHixQixHiy_all"
   (let* ((dc-size (mtx:rows xhidhix-all-g))
          (v-size (/ (mtx:columns xhidhix-all-g)
@@ -649,7 +649,7 @@
         (mtx:free xhidhix-g xhidhix-e)))
     (values xhidhixqixhiy-all-g xhidhixqixhiy-all-e)))
 
-(define (calc-xhidhidhiy eval hi xhi hiy i1 j1 i2 j2)
+(define-parameterized (calc-xhidhidhiy eval hi xhi hiy i1 j1 i2 j2)
   "Calc_xHiDHiDHiy"
   (let* ((n-size (vec:length eval))
          (d-size (mtx:rows hiy))
@@ -689,7 +689,7 @@
               (blas:axpy! (* delta d-hi-i1j2 d-hiy-i) xhi-col-j xhidhidhiy-ge)))))))
     (values xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge)))
 
-(define (calc-xhidhidhiy-all v-size eval hi xhi hiy)
+(define-parameterized (calc-xhidhidhiy-all v-size eval hi xhi hiy)
   "Calc_xHiDHiDHiy_all"
   (let* ((dc-size (mtx:columns xhi))
          (d-size (mtx:rows hiy))
@@ -714,7 +714,7 @@
                  xhidhidhiy-ge xhidhidhiy-all-ge (+ v2 (* v1 v-size)))
                 (vec:free xhidhidhiy-gg xhidhidhiy-ee xhidhidhiy-ge))))))))))
 
-(define (calc-xhidhidhix eval hi xhi i1 j1 i2 j2)
+(define-parameterized (calc-xhidhidhix eval hi xhi i1 j1 i2 j2)
   "Calc_xHiDHiDHix"
   (let* ((n-size (vec:length eval))
          (d-size (mtx:rows hi))
@@ -772,7 +772,7 @@
                  (mtx:add! xhidhidhix-gg mat-dcdc))))))))))
     (values xhidhidhix-gg xhidhidhix-ee xhidhidhix-ge)))
 
-(define (calc-xhidhidhix-all v-size eval hi xhi)
+(define-parameterized (calc-xhidhidhix-all v-size eval hi xhi)
   "Calc_xHiDHiDHix_all"
   (let* ((d-size (mtx:columns xhi))
          (dc-size (mtx:rows xhi))
@@ -802,7 +802,7 @@
                    0 (* d-size (+ v1 (* v2 v-size))) dc-size dc-size)
                   (mtx:free xhidhidhix-gg1 xhidhidhix-ee1 xhidhidhix-ge1)))))))))))
 
-(define (calc-qivec-all qi vec-all-g vec-all-e)
+(define-parameterized (calc-qivec-all qi vec-all-g vec-all-e)
   "Calc_QiVec_all"
   (let* ((qivec-all-g (vec:alloc (mtx:rows qi)))
          (qivec-all-e (vec:alloc (mtx:rows qi))))
@@ -817,7 +817,7 @@
          (mtx:vec->column! quivec-g qivec-all-g i)
          (mtx:vec->column! quivec-e qivec-all-e i)))))))
 
-(define (calc-qimat-all qi mat-all-g mat-all-e)
+(define-parameterized (calc-qimat-all qi mat-all-g mat-all-e)
   "Calc_QiMat_all"
   (let* ((dc-size (mtx:rows qi))
          (v-size (/ (mtx:columns mat-all-g)
@@ -834,7 +834,7 @@
        (submatrix->mtx! qimat-e qimat-all-e 0 (* i dc-size) dc-size dc-size)))
     (values qimat-all-g qimat-all-e)))
 
-(define (calc-yhidhiy eval hiy i j)
+(define-parameterized (calc-yhidhiy eval hiy i j)
   "Calc_yHiDHiy"
   (let* ((n-size (vec:length eval)))
     (let calc ((k 0)
@@ -850,9 +850,9 @@
                   (+ yhidhiy-g (* delta d1 d2 (if (= i j) 1 2)))
                   (+ yhidhiy-e (* d1 d2 (if (= i j) 1 2)))))))))
 
-(define (calc-ypdpy eval hiy qixhiy xhidhiy-all-g xhidhiy-all-e
-                    xhidhixqixhiy-all-g xhidhixqixhiy-all-e
-                    i j)
+(define-parameterized (calc-ypdpy eval hiy qixhiy xhidhiy-all-g xhidhiy-all-e
+                                  xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                                  i j)
   "Calc_yPDPy"
   (let* ((d-size (mtx:rows hiy))
          (v (getindex i j d-size)))
@@ -870,7 +870,7 @@
           (mtx:with-column (xhidhixqixhiy-e xhidhixqixhiy-all-e v)
                            (blas:dot qixhiy xhidhixqixhiy-e)))))))
 
-(define (calc-tracehid eval hi i j)
+(define-parameterized (calc-tracehid eval hi i j)
   (let ((n-size (vec:length eval))
         (d-size (mtx:rows hi)))
     (let calc ((k 0)
@@ -884,7 +884,7 @@
                   (+ thid-g (* delta d (if (= i j) 1 2)))
                   (+ thid-e (* d (if (= i j) 1 2)))))))))
 
-(define (calc-tracepd eval qi hi xhidhix-all-g xhidhix-all-e i j)
+(define-parameterized (calc-tracepd eval qi hi xhidhix-all-g xhidhix-all-e i j)
   (let* ((dc-size (mtx:rows qi))
          (d-size (mtx:rows hi))
          (v (getindex i j d-size)))
@@ -901,7 +901,7 @@
            (set! tpd-e (- tpd-e (blas:ddot qi-row xhidhix-e-col)))))))
       (values tpd-g tpd-e))))
 
-(define (calc-yhidhidhiy eval hi hiy i1 j1 i2 j2)
+(define-parameterized (calc-yhidhidhiy eval hi hiy i1 j1 i2 j2)
   "Calc_yHiDHiDHiy"
   (let* ((n-size (vec:length eval))
          (d-size (mtx:rows hiy))
@@ -951,14 +951,14 @@
                                 (* d-hiy-j1 d-hi-i1j2 d-hiy-i2))))))))
     (values yhidhidhiy-gg yhidhidhiy-ee yhidhidhiy-ge)))
 
-(define (calc-ypdpdpy eval hi xhi hiy qixhiy
-                      xhidhiy-all-g xhidhiy-all-e
-                      qixhidhiy-all-g qixhidhiy-all-e
-                      xhidhixqixhiy-all-g xhidhixqixhiy-all-e
-                      qixhidhixqixhiy-all-g qixhidhixqixhiy-all-e
-                      xhidhidhiy-all-gg xhidhidhiy-all-ee xhidhidhiy-all-ge
-                      xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
-                      i1 j1 i2 j2)
+(define-parameterized (calc-ypdpdpy eval hi xhi hiy qixhiy
+                                    xhidhiy-all-g xhidhiy-all-e
+                                    qixhidhiy-all-g qixhidhiy-all-e
+                                    xhidhixqixhiy-all-g xhidhixqixhiy-all-e
+                                    qixhidhixqixhiy-all-g qixhidhixqixhiy-all-e
+                                    xhidhidhiy-all-gg xhidhidhiy-all-ee xhidhidhiy-all-ge
+                                    xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                    i1 j1 i2 j2)
   "Calc_yPDPDPy"
   (let* ((d-size (mtx:rows hi))
          (v-size (* d-size (1+ d-size) 1/2))
@@ -1046,7 +1046,7 @@
                      (dec! ypdpdpy-ee (blas:dot qixhidhixqixhiy-e1 xhidhixqixhiy-e2))
                      (dec! ypdpdpy-ge (blas:dot qixhidhixqixhiy-g1 xhidhixqixhiy-e2)))))))))))))))))))
 
-(define (calc-tracehidhid eval hi i1 j1 i2 j2)
+(define-parameterized (calc-tracehidhid eval hi i1 j1 i2 j2)
   "Calc_traceHiDHiD"
   (let ((n-size (vec:length eval))
         (d-size (mtx:rows hi))
@@ -1084,11 +1084,11 @@
                             (if/= i1 j1 (* d-hi-j1i2 d-hi-i1j2))))))))
     (values thidhid-gg thidhid-ee thidhid-ge)))
 
-(define (calc-tracepdpd
-         eval qi hi xhi
-         qixhidhix-all-g qixhidhix-all-e
-         xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
-         i1 j1 i2 j2)
+(define-parameterized (calc-tracepdpd
+                       eval qi hi xhi
+                       qixhidhix-all-g qixhidhix-all-e
+                       xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                       i1 j1 i2 j2)
   "Calc_tracePDPD"
   (let* ((dc-size (mtx:rows qi))
          (d-size (mtx:rows hi))
@@ -1125,10 +1125,10 @@
               (inc! tpdpd-ge (blas:dot qixhidhix-g-row1 qixhidhix-e-col2))))))))
       (values tpdpd-gg tpdpd-ee tpdpd-ge))))
 
-(define (calc-crt hessian-inv qi
-                  qixhidhix-all-g qixhidhix-all-e
-                  xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
-                  d-size)
+(define-parameterized (calc-crt hessian-inv qi
+                                qixhidhix-all-g qixhidhix-all-e
+                                xhidhidhix-all-gg xhidhidhix-all-ee xhidhidhix-all-ge
+                                d-size)
   "CalcCRT"
   (let* ((dc-size (mtx:rows qi))
          (c-size (/ dc-size d-size))
@@ -1261,7 +1261,7 @@
           (crt-c c))
       (values crt-a crt-b crt-c))))
 
-(define (calc-dev reml? eval qi hi xhi hiy qixhiy hessian-inv gradient)
+(define-parameterized (calc-dev reml? eval qi hi xhi hiy qixhiy hessian-inv gradient)
   "CalcDev"
   (let* ((dc-size (mtx:rows qi))
          (d-size (mtx:rows hi))
@@ -1348,7 +1348,7 @@
                               (values 0 0 0))
                         (values hessian-inv crt-a crt-b crt-c)))))))))))))
 
-(define (mph-nr reml? eval x y vg ve)
+(define-parameterized ((mph-nr %mph-nr) reml? eval x y vg ve)
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows x))
          (d-size (mtx:rows y))
@@ -1458,7 +1458,7 @@
                     (set! crt-b-save crt-b)
                     (set! crt-c-save crt-c))))))))))))
 
-(define (mph-calc-beta eval w y vg ve)
+(define-parameterized ((mph-calc-beta %mph-calc-beta) eval w y vg ve)
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows w))
          (d-size (mtx:rows vg))
@@ -1524,7 +1524,7 @@
    #:arg-types (list double double)
    #:return-type double))
 
-(define (mph-calc-p eval x-row w y vg ve)
+(define-parameterized (mph-calc-p eval x-row w y vg ve)
   (let* ((n-size (vec:length eval))
          (c-size (mtx:rows w))
          (d-size (mtx:rows vg))
@@ -1595,7 +1595,7 @@
    #:arg-types (list double double)
    #:return-type double))
 
-(define (pcrt d-size p-value crt-a crt-b crt-c)
+(define-parameterized (pcrt d-size p-value crt-a crt-b crt-c)
   (let* ((p-crt 0)
          (q d-size)
          (chisq (gsl-cdf-chisq-qinv p-value d-size))
@@ -1607,7 +1607,7 @@
                        (* 2 a))))
     (gsl-cdf-chisq-q chisq-crt d-size)))
 
-(define (mvlmm-analyze markers useful-geno u eval utw uty)
+(define-parameterized (mvlmm-analyze markers useful-geno u eval utw uty)
   (let* ((n-size (mtx:rows uty))
          (d-size (mtx:columns uty))
          (c-size (mtx:columns utw))
