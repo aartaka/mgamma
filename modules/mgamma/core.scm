@@ -126,7 +126,7 @@ numbers, run multivariate LMM on the data instead of univariate."
              (uty-col (mtx:column->vec! uty 0)))
         (if (= 1 n-phenotypes)
             (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty-col n-covariates)
-            (mvlmm-analyze markers useful-geno u eval utw uty))))))
+            (mvlmm-analyze markers useful-geno useful-snps u eval utw uty))))))
 
 ;; (define geno (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
 ;; (define geno-mtx (first geno))
