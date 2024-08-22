@@ -308,6 +308,7 @@
           (mtx:with-column
            (u-col u k)
            (blas:dsyr! u-col vg #:alpha (/ 1 delta))))))
+    (blas:dsyrk! u ve #:beta 0)
     (dotimes (i d-size)
       (dotimes (j i)
         (mtx:set! vg i j (mtx:get vg j i))
