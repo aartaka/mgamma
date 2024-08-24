@@ -547,11 +547,10 @@ Return (LAMBDA LOGF) values."
   "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
-         (n-index (n-index n-covariates))
-         (uab (calc-uab-null utw uty-col)))
-    (with-cleanup
-     (calc-lambda #t n-inds n-covariates uab eval)
-     (mtx:free uab))))
+         (n-index (n-index n-covariates)))
+    (with-gsl-free
+     ((uab (calc-uab-null utw uty-col)))
+     (calc-lambda #t n-inds n-covariates uab eval))))
 
 (define (calc-rlwald l n-inds n-covariates uab eval)
   "Calculate (BETA SE P-WALD) for a given UAB and Lambda."
