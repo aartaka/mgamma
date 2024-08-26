@@ -59,10 +59,9 @@
           ((> b (2+ n-covariates)))
         (let ((index-ab (abindex a b n-covariates)))
           (if (zero? p)
-              (let* ((uab-col (mtx:column->vec! uab index-ab))
-                     (result (blas:ddot hi-eval uab-col)))
-                (vec:free uab-col)
-                (mtx:set! pab 0 index-ab result))
+              (mtx:with-column
+               (uab-col uab index-ab)
+               (mtx:set! pab 0 index-ab (blas:ddot hi-eval uab-col)))
               (let* ((index-aw (abindex a p n-covariates))
                      (index-bw (abindex b p n-covariates))
                      (index-ww (abindex p p n-covariates))
