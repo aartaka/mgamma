@@ -56,8 +56,8 @@ having less than MISS-LEVEL missing values."
                                           nans)))
                              ((= ind mtx-cols) nans)))
              (maf (/ maf (* 2 (- ind-count miss-count)))))
-        (when (and (< (/ miss-count ind-count) miss-level)
-                   (< maf-level maf (- 1 maf-level)))
+        (when (and (<= (/ miss-count ind-count) miss-level)
+                   (<= maf-level maf (- 1 maf-level)))
           (hash-set! useful-snp-table name maf))))
     useful-snp-table))
 
