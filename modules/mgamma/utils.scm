@@ -124,31 +124,14 @@ Also subtract mean from all the values to 'center' them."
     (vec:free w gw)
     mtx))
 
-(define (eigendecomposition kinship)
-  (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
-        (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
-    (lapack:dsyevr
-     lapack:+row-major+ lapack:+eigenvalues-and-eigenvectors+ lapack:+range-all+ lapack:+lower+
-     (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
-     0.0 0.0 0 0 1.0e-7
-     ;; Throwaway pointer M.
-     (make-c-struct (list int) (list 0))
-     (vec:data evalues-vec) (mtx:data evectors-mtx)
-     (mtx:rows kinship)
-     ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what this
-     ;; means. --aartaka
-     (make-c-struct
-      (make-list (* 2 (mtx:rows kinship)) int)
-      (make-list (* 2 (mtx:rows kinship)) 0)))
-    (values evalues-vec evectors-mtx)))
-
 (define (eigendecomposition-zeroed kinship)
   "Eigendecomposition, but zero the values below threshold.
 Return two values:
 - EVALUES-VEC
 - EVECTORS-MTX"
-  (receive (evalues-vec evectors-mtx)
-      (eigendecomposition kinship)
+  (receive (evalues-vec evectors-mtx kinship)
+      (eigen:solve! kinship)
+    (eigen:sort! evalues-vec evectors-mtx #t)
     (do ((i 0 (1+ i)))
         ((= i (vec:length evalues-vec)))
       (when (< (abs (vec:get evalues-vec i)) 1e-10)
