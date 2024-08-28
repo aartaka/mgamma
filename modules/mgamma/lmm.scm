@@ -464,7 +464,8 @@ have closures for that in Scheme."
              (real-part result))))))))))
 
 (define (calc-lambda calc-null? n-inds n-covariates uab eval)
-  "Calculate lambda for null (when CALC-NULL?) or alternative model (UAB from `calc-uab-alt!')
+  "Calculate lambda for null (when CALC-NULL?) or alternative model.
+(UAB from `calc-uab-alt!' or `calc-uab-null'.)
 Return (LAMBDA LOGF) values."
   (match (make-log-functions calc-null? n-inds n-covariates uab eval)
     ((log-rl-dev1 log-rl-dev2 log-rl-dev12 log-rl-f)
