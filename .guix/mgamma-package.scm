@@ -33,9 +33,8 @@
                         (substitute*
                             '("bin/mgamma")
                           (("/usr/local/bin/guile")
-                           guile-bin))
-                        #t)))
-                  (add-after 'install 'make-bin
+                           guile-bin)))))
+                  (add-after 'build 'make-bin
                     (lambda* (#:key inputs outputs #:allow-other-keys)
                       (let* ((bin (string-append (assoc-ref outputs "out")
                                                  "/bin"))
