@@ -1,12 +1,15 @@
 (define-module (mgamma utils)
-  #:use-module (srfi srfi-8)
   #:use-module (ice-9 match)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-8)
   #:use-module (system foreign)
+  #:use-module (system foreign-library)
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl vectors) #:prefix vec:)
   #:use-module ((gsl blas) #:prefix blas:)
   #:use-module ((gsl eigensystems) #:prefix eigen:)
   #:use-module ((lapack lapack) #:prefix lapack:)
+  #:use-module (rnrs base)
   #:export-syntax (inc! dec!
                         dotimes dorange
                         with-cleanup with-gsl-free
@@ -124,22 +127,76 @@ Also subtract mean from all the values to 'center' them."
     (vec:free w gw)
     mtx))
 
+(define libopenblas (load-foreign-library "libopenblas.so"))
+;; (define libopenblas (load-foreign-library "/gnu/store/vyglbwdr92nkglxzzbq9anagrby1g3g3-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
+(define dsyevr-
+  (foreign-library-function
+   libopenblas "dsyevr_"
+   #:arg-types '(* * * *
+                   * * * *
+                   * * * * *
+                   * * * *
+                   * * * *)
+   #:return-type void))
+
+(define (dsyevr jobz range uplo n a lda vl vu il iu abstol m w z ldz isuppz work lwork iwork liwork)
+  (let  ((int->ptr
+         (lambda (i)
+           (assert (integer? i))
+           (make-c-struct (list int) (list i))))
+        (char->ptr
+         (lambda (c)
+           (assert (char? c))
+           (make-c-struct (list uint8) (list (char->integer c)))))
+        (inexact->ptr
+         (lambda (f)
+           (assert (real? f))
+           (make-c-struct (list double) (list f))))
+        (info (make-c-struct (list int) '(0))))
+    (dsyevr- (char->ptr jobz) (char->ptr range) (char->ptr uplo)
+             (int->ptr n) a (int->ptr lda)
+             (inexact->ptr vl) (inexact->ptr vu)
+             (int->ptr il) (int->ptr iu)
+             (inexact->ptr abstol) m w z
+             (int->ptr ldz) isuppz work lwork iwork liwork info)
+    (unless (zero? (first (parse-c-struct info (list int))))
+      (error 'dsyevr "Failed"))))
+
 (define (eigendecomposition kinship)
-  (let ((evalues-vec (vec:alloc (mtx:rows kinship)))
-        (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship))))
-    (lapack:dsyevr
-     lapack:+row-major+ lapack:+eigenvalues-and-eigenvectors+ lapack:+range-all+ lapack:+lower+
+  (let* ((evalues-vec (vec:alloc (mtx:rows kinship)))
+         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship)))
+         ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what
+         ;; this means. --aartaka
+         (isuppz (make-c-struct
+                  (make-list (* 2 (mtx:rows kinship)) int)
+                  (make-list (* 2 (mtx:rows kinship)) 0)))
+         (int->ptr
+          (lambda (i)
+            (assert (integer? i))
+            (make-c-struct (list int) (list i))))
+         (work-temp (make-c-struct (list double) '(0)))
+         (iwork-temp (int->ptr 0)))
+    (dsyevr
+     #\V #\A #\L
      (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
-     0.0 0.0 0 0 1.0e-20
-     ;; Throwaway pointer M.
-     (make-c-struct (list int) (list 0))
-     (vec:data evalues-vec) (mtx:data evectors-mtx)
-     (mtx:rows kinship)
-     ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what this
-     ;; means. --aartaka
-     (make-c-struct
-      (make-list (* 2 (mtx:rows kinship)) int)
-      (make-list (* 2 (mtx:rows kinship)) 0)))
+     0.0 0.0 0 0 1.0e-7
+     (int->ptr 0) ;; Throwaway pointer M.
+     (vec:data evalues-vec) (mtx:data evectors-mtx) (mtx:rows kinship)
+     isuppz work-temp (int->ptr -1) iwork-temp (int->ptr -1))
+    (let* ((lwork
+            (inexact->exact (first (parse-c-struct work-temp (list double)))))
+           (liwork (first (parse-c-struct iwork-temp (list int))))
+           (work (make-c-struct (make-list lwork double)
+                                (make-list lwork 0)))
+           (iwork (make-c-struct (make-list liwork double)
+                                 (make-list liwork 0))))
+      (dsyevr
+       #\V #\A #\L
+       (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
+       0.0 0.0 0 0 1.0e-7
+       (int->ptr 0) ;; Throwaway pointer M.
+       (vec:data evalues-vec) (mtx:data evectors-mtx) (mtx:rows kinship)
+       isuppz work (int->ptr lwork) iwork (int->ptr liwork)))
     (eigen:sort! evalues-vec evectors-mtx #:ascending)
     (values evalues-vec evectors-mtx)))
 

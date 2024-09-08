@@ -3,6 +3,7 @@
  #:use-module (gnu packages guile-xyz)
  #:use-module (gnu packages databases)
  #:use-module (gnu packages bash)
+ #:use-module (gnu packages maths)
  #:use-module (guix packages)
  #:use-module (guix gexp)
  #:use-module (guix utils)
@@ -34,24 +35,34 @@
                             '("bin/mgamma")
                           (("/usr/local/bin/guile")
                            guile-bin)))))
+                  (add-before 'build 'substitute-openblas-so
+                   (lambda* (#:key inputs outputs #:allow-other-keys)
+                     (let ((openblas (string-append (assoc-ref inputs "openblas")
+                                                    "/lib/libopenblas.so")))
+                       (substitute*
+                        '("modules/mgamma/utils.scm")
+                        (("libopenblas.so")
+                         openblas))
+                       #t)))
                   (add-after 'build 'make-bin
-                    (lambda* (#:key inputs outputs #:allow-other-keys)
-                      (let* ((bin (string-append (assoc-ref outputs "out")
-                                                 "/bin"))
-                             (real (string-append bin "/mgamma"))
-                             (bash (string-append (assoc-ref inputs "bash")
-                                                  "/bin/bash"))
-                             (self (string-append (assoc-ref outputs "out")
-                                                  "/share/guile/site/3.0")))
-                        (mkdir-p bin)
-                        (copy-file "bin/mgamma" real)
-                        (wrap-program real #:sh bash
-                                      ;; For better backtraces.
-                                      (list "COLUMNS" ":" '= (list "1000"))
-                                      (list "GUILE_LOAD_PATH" ":" '= (list self (getenv "GUILE_LOAD_PATH"))))))))))
+                   (lambda* (#:key inputs outputs #:allow-other-keys)
+                     (let* ((bin (string-append (assoc-ref outputs "out")
+                                                "/bin"))
+                            (real (string-append bin "/mgamma"))
+                            (bash (string-append (assoc-ref inputs "bash")
+                                                 "/bin/bash"))
+                            (self (string-append (assoc-ref outputs "out")
+                                                 "/share/guile/site/3.0")))
+                       (mkdir-p bin)
+                       (copy-file "bin/mgamma" real)
+                       (wrap-program real #:sh bash
+                                     ;; For better backtraces.
+                                     (list "COLUMNS" ":" '= (list "1000"))
+                                     (list "GUILE_LOAD_PATH" ":" '= (list self (getenv "GUILE_LOAD_PATH"))))))))))
     (native-inputs (list guile-3.0))
     (inputs (list bash
                   guile-3.0
+                  openblas
                   guile-json-4
                   guile-lmdb-git
                   guile-gsl-git
