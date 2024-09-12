@@ -141,18 +141,18 @@ Also subtract mean from all the values to 'center' them."
 
 (define (dsyevr jobz range uplo n a lda vl vu il iu abstol m w z ldz isuppz work lwork iwork liwork)
   (let  ((int->ptr
-         (lambda (i)
-           (assert (integer? i))
-           (make-c-struct (list int) (list i))))
-        (char->ptr
-         (lambda (c)
-           (assert (char? c))
-           (make-c-struct (list uint8) (list (char->integer c)))))
-        (inexact->ptr
-         (lambda (f)
-           (assert (real? f))
-           (make-c-struct (list double) (list f))))
-        (info (make-c-struct (list int) '(0))))
+          (lambda (i)
+            (assert (integer? i))
+            (make-c-struct (list int) (list i))))
+         (char->ptr
+          (lambda (c)
+            (assert (char? c))
+            (make-c-struct (list uint8) (list (char->integer c)))))
+         (inexact->ptr
+          (lambda (f)
+            (assert (real? f))
+            (make-c-struct (list double) (list f))))
+         (info (make-c-struct (list int) '(0))))
     (dsyevr- (char->ptr jobz) (char->ptr range) (char->ptr uplo)
              (int->ptr n) a (int->ptr lda)
              (inexact->ptr vl) (inexact->ptr vu)
@@ -160,7 +160,7 @@ Also subtract mean from all the values to 'center' them."
              (inexact->ptr abstol) m w z
              (int->ptr ldz) isuppz work lwork iwork liwork info)
     (unless (zero? (first (parse-c-struct info (list int))))
-      (error 'dsyevr "Failed"))))
+      (error 'dsyevr "Failed" (first (parse-c-struct info (list int)))))))
 
 (define (eigendecomposition kinship)
   (let* ((evalues-vec (vec:alloc (mtx:rows kinship)))
