@@ -38,7 +38,7 @@
                   (add-before 'build 'substitute-openblas-so
                    (lambda* (#:key inputs outputs #:allow-other-keys)
                      (let ((openblas (string-append (assoc-ref inputs "openblas")
-                                                    "/lib/libopenblas.so")))
+                                                    "/lib/libopenblasp-r0.3.20.so")))
                        (substitute*
                         '("modules/mgamma/utils.scm")
                         (("libopenblas.so")
