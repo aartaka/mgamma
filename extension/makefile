@@ -1,7 +1,7 @@
 .PHONY: all clean
 
 CC = gcc
-CFLAGS += $(shell pkg-config --cflags openblas guile-3.0)
+CFLAGS += -g $(shell pkg-config --cflags openblas guile-3.0)
 LDFLAGS += $(shell pkg-config --libs openblas guile-3.0)
 
 libmgamma.so: extension.c

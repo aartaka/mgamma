@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "lapack.h"
 #include "libguile.h"
 
@@ -10,7 +11,7 @@ eigendecomp_ (char jobz, char range, char uplo, int n,
 {
         int isuppz[n * 2];
         int info;
-        int lwork, liwork;
+        int lwork = -1, liwork = -1;
 
         double work_temp[1];
         int iwork_temp[1];
@@ -34,7 +35,7 @@ eigendecomp (SCM jobz, SCM range, SCM uplo, SCM n,
              SCM a, SCM vl, SCM vu, SCM il, SCM iu, SCM abstol)
 {
         int N = scm_to_int(n);
-        double  *values = malloc(N * sizeof(double)),
+        double  *values  = malloc(N * sizeof(double)),
                 *vectors = malloc(N * N * sizeof(double));
         int info = eigendecomp_(scm_to_char(jobz), scm_to_char(range),
                                 scm_to_char(uplo),
@@ -43,12 +44,11 @@ eigendecomp (SCM jobz, SCM range, SCM uplo, SCM n,
                                 scm_to_int(il), scm_to_int(iu),
                                 scm_to_double(abstol), 0,
                                 values, vectors, N);
-        return scm_c_values(
-                (SCM[3])
-                {scm_from_pointer(values, NULL),
-                 scm_from_pointer(vectors, NULL),
-                 scm_from_int(info)},
-                3);
+        SCM vals[3] = {scm_from_pointer(values, NULL),
+                scm_from_pointer(vectors, NULL),
+                scm_from_int(info)};
+
+        return scm_c_values(memcpy(malloc(sizeof(vals)), vals, sizeof(vals)), 3);
 }
 
 void
