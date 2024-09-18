@@ -136,7 +136,7 @@ numbers, run multivariate LMM on the data instead of univariate."
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
 
 ;; (define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
-;;(define eigen (eigenu.txt->eigenvectors "/home/aartaka/git/GEMMA/output/BXD.eigenU.txt"))
+;; (define eigen (eigenu.txt->eigenvectors "/home/aartaka/git/GEMMA/output/iron.eigenU.txt"))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
 ;; (define params (analyze geno-mtx geno-markers kinship #f pheno-mtx '(0 1) #f))
 ;; (begin (hash-map->list (lambda (key value)
