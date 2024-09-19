@@ -277,7 +277,6 @@ and copying a ROWSxCOLS chunk."
      (begin body ...)
      (gsl-free var ...))))
 
-
 ;; Define a NAMEd procedure and PARAMETER-NAMEd parameter
 ;; variable. Proceeds with running BODY with ARGS when PARAMETER-NAMEd
 ;; variable is #false. When PARAMETER-NAME is `parameterize'd to a new
