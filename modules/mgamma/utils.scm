@@ -212,7 +212,7 @@ Return two values:
       (eigendecomposition kinship)
     (vec:for-each
      (lambda (i val)
-       (when (< (abs val) 1e-10)
+       (when (< val 1e-10)
          ;; pylmm uses 1e-6 instead
          (vec:set! evalues-vec i 0)))
      evalues-vec)
