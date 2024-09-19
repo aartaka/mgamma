@@ -166,14 +166,42 @@ Also subtract mean from all the values to 'center' them."
 ;; (load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
 
 (define (eigendecomposition kinship)
-  (receive (vals vecs status)
-      (eigendecomp (char->integer #\V) (char->integer #\A) (char->integer #\L)
-                   (mtx:rows kinship) (mtx:data kinship)
-                   0.0 0.0 0 0 1.0e-7)
-    (let ((evalues-vec (vec:alloc (mtx:rows kinship) vals))
-          (evectors-mtx (mtx:alloc-square (mtx:rows kinship) vecs)))
-      (eigen:sort! evalues-vec evectors-mtx #:ascending)
-      (values evalues-vec evectors-mtx))))
+  (let* ((evalues-vec (vec:alloc (mtx:rows kinship)))
+         (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship)))
+         ;; NOTE: That's what GEMMA defines ISUPPZ like. No idea what
+         ;; this means. --aartaka
+         (isuppz (make-c-struct
+                  (make-list (* 2 (mtx:rows kinship)) int)
+                  (make-list (* 2 (mtx:rows kinship)) 0)))
+         (int->ptr
+          (lambda (i)
+            (assert (integer? i))
+            (make-c-struct (list int) (list i))))
+         (work-temp (make-c-struct (list double) '(0)))
+         (iwork-temp (int->ptr 0)))
+    (dsyevr
+     #\V #\A #\L
+     (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
+     0.0 0.0 0 0 1.0e-7
+     (int->ptr 0) ;; Throwaway pointer M.
+     (vec:data evalues-vec) (mtx:data evectors-mtx) (mtx:rows kinship)
+     isuppz work-temp (int->ptr -1) iwork-temp (int->ptr -1))
+    (let* ((lwork
+            (inexact->exact (first (parse-c-struct work-temp (list double)))))
+           (liwork (first (parse-c-struct iwork-temp (list int))))
+           (work (make-c-struct (make-list lwork double)
+                                (make-list lwork 0)))
+           (iwork (make-c-struct (make-list liwork double)
+                                 (make-list liwork 0))))
+      (dsyevr
+       #\V #\A #\L
+       (mtx:rows kinship) (mtx:data kinship) (mtx:rows kinship)
+       0.0 0.0 0 0 1.0e-7
+       (int->ptr 0) ;; Throwaway pointer M.
+       (vec:data evalues-vec) (mtx:data evectors-mtx) (mtx:rows kinship)
+       isuppz work (int->ptr lwork) iwork (int->ptr liwork)))
+    (eigen:sort! evalues-vec evectors-mtx #:ascending)
+    (values evalues-vec evectors-mtx)))
 
 (define (eigendecomposition-zeroed kinship)
   "Eigendecomposition, but zero the values below threshold.
