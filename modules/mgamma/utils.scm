@@ -218,6 +218,15 @@ Return two values:
      evalues-vec)
     (values evalues-vec evectors-mtx)))
 
+;; (define %cblas-dgemm
+;;   (foreign-library-function
+;;    gsl:libgslcblas "cblas_dgemm"
+;;    #:return-type void
+;;    #:arg-types (list int int int
+;;                      int int int
+;;                      double '* int '* int
+;;                      double '* int)))
+
 (define-syntax-rule (with-cleanup form cleanup ...)
   (dynamic-wind
     (lambda ()
