@@ -4,6 +4,7 @@
   #:use-module (srfi srfi-8)
   #:use-module (system foreign)
   #:use-module (system foreign-library)
+  ;; #:use-module ((gsl core) #:prefix gsl:)
   #:use-module ((gsl matrices) #:prefix mtx:)
   #:use-module ((gsl vectors) #:prefix vec:)
   #:use-module ((gsl blas) #:prefix blas:)
@@ -21,6 +22,7 @@
             center-matrix!
             eigendecomposition
             eigendecomposition-zeroed
+            ;; cblas-dgemm
             submatrix
             submatrix->mtx!
             subvector
@@ -224,8 +226,27 @@ Return two values:
 ;;    #:return-type void
 ;;    #:arg-types (list int int int
 ;;                      int int int
-;;                      double '* int '* int
+;;                      double '* int
+;;                      '* int
 ;;                      double '* int)))
+
+;; (define (cblas-dgemm transpose-a transpose-b alpha a b beta c)
+;;   (assert (and (mtx:mtx? a) (mtx:mtx? b) (mtx:mtx? c)))
+;;   (%cblas-dgemm
+;;    blas:+row-major+
+;;    (if transpose-a
+;;        blas:+transpose+
+;;        blas:+no-transpose+)
+;;    (if transpose-b
+;;        blas:+transpose+
+;;        blas:+no-transpose+)
+;;    (mtx:rows c) (mtx:columns c)
+;;    (if transpose-a
+;;        (mtx:rows a)
+;;        (mtx:columns a))
+;;    alpha (mtx:data a) (third (mtx:parts a))
+;;    (mtx:data b) (third (mtx:parts b))
+;;    beta (mtx:data c) (third (mtx:parts c))))
 
 (define-syntax-rule (with-cleanup form cleanup ...)
   (dynamic-wind
