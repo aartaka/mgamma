@@ -44,10 +44,9 @@
   "Calculate the kinship matrix for GENO-MTX.
 Only calculate if for USEFUL-SNPS out of MARKERS."
   (let* ((n-useful-snps (hash-count (lambda (k v) #t) useful-snps))
-         ;; Because we need to sort the useful SNPs into their own matrix.
-         (intermediate-mtx (mtx:alloc n-useful-snps (mtx:columns geno-mtx)))
          (tmp-vec (vec:alloc (mtx:columns geno-mtx) 0)))
     (with-gsl-free
+     ;; Because we need to sort the useful SNPs into their own matrix.
      ((intermediate-mtx (mtx:alloc n-useful-snps (mtx:columns geno-mtx)))
       (tmp-vec (vec:alloc (mtx:columns geno-mtx) 0)))
      (do ((i 0 (1+ i))
