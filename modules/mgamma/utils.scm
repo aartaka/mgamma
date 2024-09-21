@@ -114,20 +114,18 @@ Also subtract mean from all the values to 'center' them."
 
 (define (center-matrix! mtx)
   "Weird one directly copied from GEMMA's CenterMatrix."
-  (let* ((size (mtx:rows mtx))
-         (w (vec:alloc size 1.0))
-         (gw (blas:gemv mtx w)))
-    (blas:syr2! gw w mtx #:alpha (/ -1 size))
-    (let ((d (blas:dot w gw)))
-      (blas:syr! w mtx #:alpha (/ d (expt size 2))))
-    ;; GEMMA says it's transpose, but I don't believe it --aartaka.
-    (do ((i 0 (1+ i)))
-        ((= i size))
-      (do ((j 0 (1+ j)))
-          ((= j i))
-        (mtx:set! mtx i j (mtx:get mtx j i))))
-    (vec:free w gw)
-    mtx))
+  (let* ((size (mtx:rows mtx)))
+    (with-gsl-free
+     ((w (vec:alloc size 1.0))
+      (gw (blas:gemv mtx w)))
+     (blas:syr2! gw w mtx #:alpha (/ -1 size))
+     (blas:syr! w mtx #:alpha (/ (blas:dot w gw) (* size size)))
+     ;; GEMMA says it's transpose, but I don't believe it --aartaka.
+     (dotimes (i size)
+       (dotimes (j i)
+         (mtx:set! mtx i j (mtx:get mtx j i))))
+     mtx)))
+
 
 (define libopenblas (load-foreign-library "libopenblas.so"))
 ;; (define libopenblas (load-foreign-library "/gnu/store/vyglbwdr92nkglxzzbq9anagrby1g3g3-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
