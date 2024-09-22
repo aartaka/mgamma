@@ -10,7 +10,7 @@ libmgamma.so: extension.c
 all: libmgamma.so
 
 indent: extension.c
-	indent -linux --procnames-start-lines $^
+	indent --k-and-r-style --indent-level8 --tab-size8 --procnames-start-lines $^
 
 clean:
 	-rm libmgamma.so

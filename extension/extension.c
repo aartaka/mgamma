@@ -14,17 +14,18 @@ eigendecomp_(char jobz, char range, char uplo, int n,
 
 	double work_temp[1];
 	int iwork_temp[1];
-	dsyevr_(&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol,
-		&m, w, z, &ldz, isuppz, work_temp, &lwork, iwork_temp, &liwork,
-		&info);
+	dsyevr_(&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu,
+		&abstol, &m, w, z, &ldz, isuppz, work_temp, &lwork,
+		iwork_temp, &liwork, &info);
 	if (info)
 		return info;
 	lwork = *work_temp;
 	liwork = *iwork_temp;
 	double work[lwork];
 	int iwork[liwork];
-	dsyevr_(&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu, &abstol,
-		&m, w, z, &ldz, isuppz, work, &lwork, iwork, &liwork, &info);
+	dsyevr_(&jobz, &range, &uplo, &n, a, &lda, &vl, &vu, &il, &iu,
+		&abstol, &m, w, z, &ldz, isuppz, work, &lwork, iwork,
+		&liwork, &info);
 	if (info)
 		return info;
 	return 0;
@@ -49,8 +50,9 @@ eigendecomp(SCM jobz, SCM range, SCM uplo, SCM n,
 		scm_from_int(info)
 	};
 
-	return scm_c_values(memcpy(malloc(sizeof(vals)), vals, sizeof(vals)),
-			    3);
+	return
+	    scm_c_values(memcpy(malloc(sizeof(vals)), vals, sizeof(vals)),
+			 3);
 }
 
 void
