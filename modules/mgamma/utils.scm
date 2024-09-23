@@ -172,8 +172,8 @@ Also subtract mean from all the values to 'center' them."
                    0.0 0.0 0 0 1.0e-7)
     (let ((evalues-vec (vec:alloc (mtx:rows kinship) vals))
           (evectors-mtx (mtx:alloc-square (mtx:rows kinship) vecs)))
-      ;; FIXME: Doesn't give the right results yet—matrix not
-      ;; transposed? --aartaka
+      ;; FIXME: Doesn't give the right results yet—some signs are
+      ;; inverted. Sigh. --aartaka
       (eigen:sort! evalues-vec evectors-mtx #:ascending)
       (mtx:transpose! evectors-mtx #f)
       (values evalues-vec evectors-mtx))))
