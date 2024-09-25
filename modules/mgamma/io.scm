@@ -146,7 +146,7 @@ Return a (MATRIX MARKER-NAMES) list."
         (let ((ind (string->number (first inds))))
           (when ind
             (mtx:set! mtx row col ind)))))
-    (list mtx (map first lines))))
+    (values mtx (map first lines))))
 
 (define (pointer=? ptr1 ptr2 size)
   (bytevector=? (pointer->bytevector ptr1 size)
