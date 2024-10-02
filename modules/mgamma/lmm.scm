@@ -255,11 +255,12 @@ have closures for that in Scheme."
                                       n-covariates))
                    (p-yy (mtx:get pab nc-total index-ww))
                    (pp-yy (mtx:get ppab nc-total index-ww))
-                   (y-pkp-y (/ (- p-yy pp-yy) l)))
-              (real-part
-               (+ (* -1/2 trace-pk)
-                  (/ (* 1/2 df y-pkp-y)
-                     p-yy)))))))))))
+                   (y-pkp-y (/ (- p-yy pp-yy) l))
+                   (result (real-part
+                            (+ (* -1/2 trace-pk)
+                               (/ (* 1/2 df y-pkp-y)
+                                  p-yy)))))
+              result))))))))
    ;; LogRL_dev2
    (lambda (l)
      (let ((nc-total (if calc-null?
