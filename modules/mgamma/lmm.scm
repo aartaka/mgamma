@@ -82,14 +82,15 @@
           ((> b (2+ n-covariates)))
         (let ((index-ab (abindex a b n-covariates)))
           (if (zero? p)
-              (let* ((uab-col (mtx:column->vec! uab index-ab))
-                     (result (blas:dot hi-hi-eval uab-col)))
-                (vec:free uab-col)
-                (mtx:set! ppab 0 index-ab result))
+              (mtx:with-column
+               (uab-col uab index-ab)
+               (mtx:set!
+                ppab 0 index-ab
+                (blas:dot hi-hi-eval uab-col)))
               (let* ((index-aw (abindex a p n-covariates))
                      (index-bw (abindex b p n-covariates))
                      (index-ww (abindex p p n-covariates))
-                     (ps2-ab (mtx:get pab (1- p) index-ab))
+                     (ps2-ab (mtx:get ppab (1- p) index-ab))
                      (ps-aw (mtx:get pab (1- p) index-aw))
                      (ps-bw (mtx:get pab (1- p) index-bw))
                      (ps-ww (mtx:get pab (1- p) index-ww))
@@ -101,13 +102,11 @@
                                  (-
                                   (+ ps2-ab
                                      (/ (* ps-aw ps-bw ps2-ww)
-                                        ps-ww
-                                        ps-ww))
+                                        (* ps-ww ps-ww)))
                                   (/ (+ (* ps-aw ps2-bw)
                                         (* ps-bw ps2-aw))
                                      ps-ww)))))
-                (mtx:set! pab p index-ab result))))))))
-
+                (mtx:set! ppab p index-ab result))))))))
 (define (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
   (do ((p 0 (1+ p))) ;; rows phenotypes + covariates
       ((> p (1+ n-covariates)))
@@ -120,7 +119,7 @@
               (let* ((uab-col (mtx:column->vec! uab index-ab))
                      (result (blas:ddot hi-hi-hi-eval uab-col)))
                 (vec:free uab-col)
-                (mtx:set! pab 0 index-ab result))
+                (mtx:set! pppab 0 index-ab result))
               (let* ((index-aw (abindex a p n-covariates))
                      (index-bw (abindex b p n-covariates))
                      (index-ww (abindex p p n-covariates))
@@ -148,7 +147,7 @@
                                         (* ps-bw ps2-aw ps2-ww)
                                         (* ps-aw ps-bw ps3-ww))
                                      (* ps-ww ps-ww))))))
-                (mtx:set! pab p index-ab result)))))))
+                (mtx:set! pppab p index-ab result)))))))
   ;; TODO
   #f)
 
