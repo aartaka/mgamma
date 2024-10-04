@@ -110,7 +110,7 @@
         (eigen-proc vg ve)
       (receive (qi logdet-q)
           (calc-qi eval dl x)
-        (let ((utvehiy (blas:gemm ultvehi y))
+        (let ((ultvehiy (blas:gemm ultvehi y))
               (xhiy (vec:calloc (* d-size c-size))))
           (dotimes (i d-size)
             (do ((j 0 (1+ j))
@@ -119,7 +119,7 @@
               (dotimes (k n-size)
                 (inc! d
                       (/ (* (mtx:get x j k)
-                            (mtx:get utvehiy i k))
+                            (mtx:get ultvehiy i k))
                          (1+ (* (vec:get eval k)
                                 (vec:get dl i))))))
               (vec:set! xhiy (+ i (* j d-size)) d)))
