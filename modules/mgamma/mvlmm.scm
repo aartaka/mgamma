@@ -1420,9 +1420,8 @@
                                 (v-temp (mtx:rows ve) (mtx:columns ve) mtx)
                                 (receive (d-temp u-temp)
                                     (eigendecomposition v-temp)
-                                  (dotimes (i d-size)
-                                    (unless (positive? (vec:get d-temp i))
-                                      (set! positive-definite? #f))))))))
+                                  (unless (vec:positive? d-temp)
+                                    (set! positive-definite? #f)))))))
                         (check-definite ve)
                         (check-definite vg))
                       (when positive-definite?
