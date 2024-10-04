@@ -296,7 +296,7 @@
      (blas:gemm! ultveh m sigma-ee #:transpose-a #t #:beta 0))
     (values sigma-uu sigma-ee)))
 
-(define (update-v eval u sigma-uu sigma-ee vg ve)
+(define (update-v eval u e sigma-uu sigma-ee vg ve)
   "UpdateV"
   (mtx:fill! vg 0)
   (mtx:fill! ve 0)
@@ -308,7 +308,7 @@
           (mtx:with-column
            (u-col u k)
            (blas:dsyr! u-col vg #:alpha (/ 1 delta))))))
-    (blas:dsyrk! u ve #:beta 0)
+    (blas:dsyrk! e ve #:beta 0)
     (dotimes (i d-size)
       (dotimes (j i)
         (mtx:set! vg i j (mtx:get vg j i))
