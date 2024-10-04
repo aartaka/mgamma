@@ -345,7 +345,6 @@
                             (* -1/2 n-size d-size (log (* 2 +pi+))))))
           (logl-old #f)
           (logl-new #f))
-      ;; TODO: Precision check
       (do ((t 0 (1+ t)))
           ((or (= t (em-iter))
                (and (positive? t)
