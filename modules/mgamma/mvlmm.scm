@@ -351,44 +351,43 @@
                     logl-old
                     (< (abs (- logl-new logl-old))
                        (em-precision)))))
-          (receive (dl ultveh ultvehi logdet-ve)
-              (eigen-proc vg ve)
-            (receive (qi logdet-q)
-                (calc-qi eval dl x)
-              (blas:gemm! ultvehi y ultvehiy #:beta 0)
-              (let* ((xhiy (calc-x-hi-y eval dl x ultvehiy)))
-                (set! logl-old logl-new)
-                (set! logl-new
-                  (+ logl-const
-                     (mph-calc-logl eval xhiy dl ultvehiy qi)
-                     ;; - 0.5 * (double)n_size * logdet_Ve;
-                     (* -1/2 n-size logdet-ve)
-                     (if reml?
-                         (* -1/2 (- logdet-q (* c-size logdet-ve)))
-                         0)))
-                (receive (omega-u omega-e)
-                    (calc-omega eval dl)
-                  (cond
-                   (reml?
-                    (update-rl-b xhiy qi ultvehib)
-                    (blas:gemm! ultvehib x ultvehibx #:beta 0))
-                   ((zero? t)
-                    (blas:gemm! ultvehi b ultvehib #:beta 0)
-                    (blas:gemm! ultvehib x ultvehibx #:beta 0)))
-                  (update-u omega-e ultvehiy ultvehibx ultvehiu)
-                  (unless reml?
-                    (update-l-b x xxti ultvehiy ultvehiu ultvehibx ultvehib)
-                    (blas:gemm! ultvehib x ultvehibx #:beta 0))
-                  (update-e ultvehiy ultvehibx ultvehiu ultvehie)
-                  (let* ((u-hat (blas:gemm ultveh ultvehiu #:transpose-a #t))
-                         (e-hat (blas:gemm ultveh ultvehie #:transpose-a #t))
-                         (b (blas:gemm ultveh ultvehib #:transpose-a #t)))
-                    (receive (sigma-uu sigma-ee)
-                        (calc-sigma reml? eval dl x omega-u omega-e ultveh qi)
-                      (update-v eval u-hat sigma-uu sigma-ee vg ve)
-                      (mtx:free ultveh ultvehi qi
-                                omega-u omega-e u-hat e-hat b sigma-uu sigma-ee)
-                      (vec:free dl xhiy))))))))
+        (receive (dl ultveh ultvehi logdet-ve)
+            (eigen-proc vg ve)
+          (receive (qi logdet-q)
+              (calc-qi eval dl x)
+            (blas:gemm! ultvehi y ultvehiy #:beta 0)
+            (let* ((xhiy (calc-x-hi-y eval dl x ultvehiy)))
+              (set! logl-old logl-new)
+              (set! logl-new
+                (+ logl-const
+                   (mph-calc-logl eval xhiy dl ultvehiy qi)
+                   ;; - 0.5 * (double)n_size * logdet_Ve;
+                   (* -1/2 n-size logdet-ve)
+                   (if reml?
+                       (* -1/2 (- logdet-q (* c-size logdet-ve)))
+                       0)))
+              (receive (omega-u omega-e)
+                  (calc-omega eval dl)
+                (cond
+                 (reml?
+                  (update-rl-b xhiy qi ultvehib))
+                 ((zero? t)
+                  (blas:gemm! ultvehi b ultvehib #:beta 0)))
+                (blas:gemm! ultvehib x ultvehibx #:beta 0)
+                (update-u omega-e ultvehiy ultvehibx ultvehiu)
+                (unless reml?
+                  (update-l-b x xxti ultvehiy ultvehiu ultvehibx ultvehib)
+                  (blas:gemm! ultvehib x ultvehibx #:beta 0))
+                (update-e ultvehiy ultvehibx ultvehiu ultvehie)
+                (let* ((u-hat (blas:gemm ultveh ultvehiu #:transpose-a #t))
+                       (e-hat (blas:gemm ultveh ultvehie #:transpose-a #t))
+                       (b (blas:gemm ultveh ultvehib #:transpose-a #t)))
+                  (receive (sigma-uu sigma-ee)
+                      (calc-sigma reml? eval dl x omega-u omega-e ultveh qi)
+                    (update-v eval u-hat e-hat sigma-uu sigma-ee vg ve)
+                    (mtx:free ultveh ultvehi qi
+                              omega-u omega-e u-hat e-hat b sigma-uu sigma-ee)
+                    (vec:free dl xhiy))))))))
       (mtx:free xxt xxti ultvehib ultvehibx ultvehiu ultvehie ultvehiy)
       (values vg ve logl-new))))
 
