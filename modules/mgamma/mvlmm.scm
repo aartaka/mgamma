@@ -1626,7 +1626,7 @@
         (mph-initial eval x y)
       (receive (vg ve logl-h0)
           (mph-em #:reml eval x y vg ve b-sub)
-        (receive (logl-h0 hessian-inv crt-a crt-b crt-c)
+        (receive (hessian-inv crt-a crt-b crt-c logl-h0)
             (mph-nr #:reml eval x y vg ve)
           (with-gsl-free
            ((x-sub (submatrix x 0 0 c-size n-size)))
