@@ -323,14 +323,15 @@ have closures for that in Scheme."
                      (ypkpkpy (/ (+ pp-yy
                                     ppp-yy
                                     (- (* 2 pp-yy)))
-                                 (* l l))))
-                (real-part
-                 (- (* 1/2 trace-pkpk)
-                    (* 1/2
-                       df
-                       (- (* 2 ypkpkpy p-yy)
-                          (expt ypkpy 2))
-                       (/ 1 (expt p-yy 2)))))))))))))))
+                                 (* l l)))
+                     (result (real-part
+                              (- (* 1/2 trace-pkpk)
+                                 (* 1/2
+                                    df
+                                    (- (* 2 ypkpkpy p-yy)
+                                       (expt ypkpy 2))
+                                    (/ 1 (expt p-yy 2)))))))
+                result))))))))))
    ;; LogRL_dev12
    (lambda (l)
      (let ((nc-total (if calc-null?
