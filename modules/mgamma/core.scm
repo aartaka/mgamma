@@ -129,17 +129,16 @@ numbers, run multivariate LMM on the data instead of univariate."
             (mvlmm-analyze markers useful-geno useful-snps u eval utw uty))))))
 
 ;; (define-values (geno-mtx geno-markers)
-;;   (geno.txt->genotypes-mtx "/home/aartaka/Downloads/iron/iron_geno.txt"))
-;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/Downloads/iron/iron_pheno.txt"))
+;;   (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
+;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
-
 ;; (define kinship
-;;   ;; (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/iron.cXX.txt")
-;;   (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f))
+;;   (cxx.txt->kinship "/home/aartaka/git/GEMMA/output/bxd.cXX.txt")
+;;   ;; (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f))
 ;;   )
 ;; (define eigen (eigenu.txt->eigenvectors "/home/aartaka/git/GEMMA/output/iron.eigenU.txt"))
 ;; (define useful-inds (useful-individuals pheno-mtx #f))
-;; (define params (analyze geno-mtx geno-markers kinship #f pheno-mtx '(0 1) #f))
+;; (define params (analyze geno-mtx geno-markers kinship #f pheno-mtx '(0) #f))
 ;; (begin (hash-map->list (lambda (key value)
 ;;                          (format #t "~a: ~s~%" key value))
 ;;                        params)
