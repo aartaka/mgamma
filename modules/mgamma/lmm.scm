@@ -304,13 +304,11 @@ have closures for that in Scheme."
                                  (ps-ww (mtx:get pab i index-ww))
                                  (ps2-ww (mtx:get ppab i index-ww))
                                  (ps3-ww (mtx:get pppab i index-ww)))
-                            (set! trace-p (- trace-p (/ ps2-ww ps-ww)))
-                            (set! trace-pp
-                                  (+ trace-pp
-                                     (- (/ (expt ps2-ww 2)
-                                           (expt ps-ww 2))
-                                        (/ (* 2 ps3-ww)
-                                           ps-ww)))))))
+                            (dec! trace-p (/ ps2-ww ps-ww))
+                            (inc! trace-pp (- (/ (expt ps2-ww 2)
+                                                 (expt ps-ww 2))
+                                              (/ (* 2 ps3-ww)
+                                                 ps-ww))))))
                      (trace-pkpk (/ (+ df
                                        trace-pp
                                        (- (* 2 trace-p)))
