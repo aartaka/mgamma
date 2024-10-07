@@ -12,6 +12,7 @@
   #:use-module ((lapack lapack) #:prefix lapack:)
   #:use-module (rnrs base)
   #:export-syntax (inc! dec!
+                        approximately-zero?
                         dotimes dorange
                         with-cleanup with-gsl-free
                         define-parameterized)
@@ -44,6 +45,9 @@
 
 (define (2+ number)
   (+ number 2))
+
+(define (approximately-zero? x)
+  (< (abs x) 1e-10))
 
 (define-syntax dotimes
   (syntax-rules ()

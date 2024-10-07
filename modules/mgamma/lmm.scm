@@ -69,7 +69,7 @@
                      (ps-aw (mtx:get pab (1- p) index-aw))
                      (ps-bw (mtx:get pab (1- p) index-bw))
                      (ps-ww (mtx:get pab (1- p) index-ww))
-                     (result (if (zero? ps-ww)
+                     (result (if (approximately-zero? ps-ww)
                                  ps-ab
                                  (- ps-ab (/ (* ps-aw ps-bw) ps-ww)))))
                 (mtx:set! pab p index-ab result))))))))
@@ -97,7 +97,7 @@
                      (ps2-aw (mtx:get ppab (1- p) index-aw))
                      (ps2-bw (mtx:get ppab (1- p) index-bw))
                      (ps2-ww (mtx:get ppab (1- p) index-ww))
-                     (result (if (zero? ps-ww)
+                     (result (if (approximately-zero? ps-ww)
                                  ps2-ab
                                  (-
                                   (+ ps2-ab
@@ -134,7 +134,7 @@
                      (ps3-aw (mtx:get ppab (1- p) index-aw))
                      (ps3-bw (mtx:get ppab (1- p) index-bw))
                      (ps3-ww (mtx:get ppab (1- p) index-ww))
-                     (result (if (zero? ps-ww)
+                     (result (if (approximately-zero? ps-ww)
                                  ps3-ab
                                  (+ (- ps3-ab
                                        (/ (* ps-aw ps-bw ps2-ww)
