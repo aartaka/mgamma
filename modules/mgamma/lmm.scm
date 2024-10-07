@@ -258,11 +258,10 @@ have closures for that in Scheme."
                    (p-yy (mtx:get pab nc-total index-ww))
                    (pp-yy (mtx:get ppab nc-total index-ww))
                    (y-pkp-y (/ (- p-yy pp-yy) l))
-                   (result (real-part
-                            (+ (* -1/2 (if reml? trace-pk trace-hik))
-                               (/ (* 1/2 df y-pkp-y)
-                                  p-yy)))))
-              result))))))))
+                   (result (+ (* -1/2 (if reml? trace-pk trace-hik))
+                              (/ (* 1/2 df y-pkp-y)
+                                 p-yy))))
+              (real-part result)))))))))
    ;; LogRL_dev2
    (lambda (l)
      (let ((nc-total (if calc-null?
@@ -339,16 +338,15 @@ have closures for that in Scheme."
                                     ppp-yy
                                     (- (* 2 pp-yy)))
                                  (expt l 2)))
-                     (result (real-part
-                              (- (* 1/2 (if reml?
-                                            trace-pkpk
-                                            trace-hik-hik))
-                                 (* 1/2
-                                    df
-                                    (- (* 2 ypkpkpy p-yy)
-                                       (expt ypkpy 2))
-                                    (/ 1 (expt p-yy 2)))))))
-                result))))))))))
+                     (result (- (* 1/2 (if reml?
+                                           trace-pkpk
+                                           trace-hik-hik))
+                                (* 1/2
+                                   df
+                                   (- (* 2 ypkpkpy p-yy)
+                                      (expt ypkpy 2))
+                                   (/ 1 (expt p-yy 2))))))
+                (real-part result)))))))))))
    ;; LogRL_dev12
    (lambda (l)
      (let ((nc-total (if calc-null?
