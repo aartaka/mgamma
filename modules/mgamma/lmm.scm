@@ -102,7 +102,7 @@
                                  (-
                                   (+ ps2-ab
                                      (/ (* ps-aw ps-bw ps2-ww)
-                                        (* ps-ww ps-ww)))
+                                        (expt ps-ww 2)))
                                   (/ (+ (* ps-aw ps2-bw)
                                         (* ps-bw ps2-aw))
                                      ps-ww)))))
@@ -313,7 +313,7 @@ have closures for that in Scheme."
                      (trace-pkpk (/ (+ df
                                        trace-pp
                                        (- (* 2 trace-p)))
-                                    (* l l)))
+                                    (expt l 2)))
                      (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
                      (p-yy (mtx:get pab nc-total index-ww))
                      (pp-yy (mtx:get ppab nc-total index-ww))
@@ -322,7 +322,7 @@ have closures for that in Scheme."
                      (ypkpkpy (/ (+ pp-yy
                                     ppp-yy
                                     (- (* 2 pp-yy)))
-                                 (* l l)))
+                                 (expt l 2)))
                      (result (real-part
                               (- (* 1/2 trace-pkpk)
                                  (* 1/2
@@ -396,7 +396,7 @@ have closures for that in Scheme."
                      (ypkpkpy (/ (+ p-yy
                                     ppp-yy
                                     (- (* 2 pp-yy)))
-                                 (* l l)))
+                                 (expt l 2)))
                      (dev1 (+ (* -1/2 trace-pk)
                               (/ (* 1/2 df ypkpy)
                                  p-yy)))
