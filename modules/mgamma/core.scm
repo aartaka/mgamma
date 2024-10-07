@@ -122,10 +122,9 @@ numbers, run multivariate LMM on the data instead of univariate."
               (or eigenvectors u))
              (utw (blas:gemm u w #:transpose-a #t))
              (uty (blas:gemm u y #:transpose-a #t))
-             (y-col (mtx:column->vec! y 0))
-             (uty-col (mtx:column->vec! uty 0)))
+             (y-col (mtx:column->vec! y 0)))
         (if (= 1 n-phenotypes)
-            (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty-col n-covariates)
+            (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty n-covariates)
             (mvlmm-analyze markers useful-geno useful-snps u eval utw uty))))))
 
 ;; (define-values (geno-mtx geno-markers)

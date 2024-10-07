@@ -616,11 +616,12 @@ Return (LAMBDA LOGF) values."
             (values vg ve beta))))))))
 
 (define (lmm-analyze markers useful-geno useful-inds useful-snps
-                     u eval utw uty-col
+                     u eval utw uty
                      n-covariates)
   (let* ((n-markers (length markers))
          (n-phenotypes (mtx:columns utw))
          (n-useful-inds (length useful-inds))
+         (uty-col (mtx:column->vec! uty 0))
          (uab (calc-uab-null utw uty-col))
          (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t))
          (per-snp-params (make-hash-table n-markers)))
