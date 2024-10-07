@@ -206,7 +206,7 @@
 
 ;; This function exists for the sole reason of closing over UAB et
 ;; al. while passing the generated functions to GSL root solvers.
-(define (make-log-functions calc-null? n-inds n-covariates uab eval)
+(define (make-log-functions reml? calc-null? n-inds n-covariates uab eval)
   "Used to create functions closed over UAB, EVAL etc.
 GEMMA uses FUNC_PARAMS struct and GSL root setters for that, but we
 have closures for that in Scheme."
@@ -217,10 +217,12 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates
-                  (if calc-null?
-                      0
-                      1))))
+           (df (if reml?
+                   n-inds
+                   (- n-inds n-covariates
+                      (if calc-null?
+                          0
+                          1)))))
        (vec:with
         (hi-eval (vec:length eval) 1)
         (vec:with
@@ -239,6 +241,7 @@ have closures for that in Scheme."
             (ppab (2+ n-covariates) n-index)
             (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
             (let* ((trace-hi (blas:dot hi-eval v-temp))
+                   (trace-hik (/ (- df trace-hi) l))
                    (trace-p
                     (do ((i 0 (1+ i))
                          (trace-p
@@ -256,7 +259,7 @@ have closures for that in Scheme."
                    (pp-yy (mtx:get ppab nc-total index-ww))
                    (y-pkp-y (/ (- p-yy pp-yy) l))
                    (result (real-part
-                            (+ (* -1/2 trace-pk)
+                            (+ (* -1/2 (if reml? trace-pk trace-hik))
                                (/ (* 1/2 df y-pkp-y)
                                   p-yy)))))
               result))))))))
@@ -266,10 +269,12 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates
-                  (if calc-null?
-                      0
-                      1)))
+           (df (if reml?
+                   (- n-inds n-covariates
+                      (if calc-null?
+                          0
+                          1))
+                   n-inds))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -296,19 +301,31 @@ have closures for that in Scheme."
               (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
               (let* ((trace-hi (blas:dot hi-eval v-temp))
                      (trace-hi-hi (blas:dot hi-hi-eval v-temp))
+                     (trace-hi (- n-inds trace-hi))
+                     (trace-hi-hi (if reml?
+                                      trace-hi-hi
+                                      (+ (* 2 trace-hi)
+                                         trace-hi-hi
+                                         (- n-inds))))
+                     (trace-hik-hik (/
+                                     (+ n-inds
+                                        trace-hi-hi
+                                        (- (* 2 trace-hi)))
+                                     (expt l 2)))
                      (trace-p trace-hi)
                      (trace-pp trace-hi-hi)
-                     (_ (do ((i 0 (1+ i)))
-                            ((= i nc-total))
-                          (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
-                                 (ps-ww (mtx:get pab i index-ww))
-                                 (ps2-ww (mtx:get ppab i index-ww))
-                                 (ps3-ww (mtx:get pppab i index-ww)))
-                            (dec! trace-p (/ ps2-ww ps-ww))
-                            (inc! trace-pp (- (/ (expt ps2-ww 2)
-                                                 (expt ps-ww 2))
-                                              (/ (* 2 ps3-ww)
-                                                 ps-ww))))))
+                     (_ (when reml?
+                          (do ((i 0 (1+ i)))
+                              ((= i nc-total))
+                            (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
+                                   (ps-ww (mtx:get pab i index-ww))
+                                   (ps2-ww (mtx:get ppab i index-ww))
+                                   (ps3-ww (mtx:get pppab i index-ww)))
+                              (dec! trace-p (/ ps2-ww ps-ww))
+                              (inc! trace-pp (- (/ (expt ps2-ww 2)
+                                                   (expt ps-ww 2))
+                                                (/ (* 2 ps3-ww)
+                                                   ps-ww)))))))
                      (trace-pkpk (/ (+ df
                                        trace-pp
                                        (- (* 2 trace-p)))
@@ -318,12 +335,14 @@ have closures for that in Scheme."
                      (pp-yy (mtx:get ppab nc-total index-ww))
                      (ppp-yy (mtx:get pppab nc-total index-ww))
                      (ypkpy (/ (- p-yy pp-yy) l))
-                     (ypkpkpy (/ (+ pp-yy
+                     (ypkpkpy (/ (+ p-yy
                                     ppp-yy
                                     (- (* 2 pp-yy)))
                                  (expt l 2)))
                      (result (real-part
-                              (- (* 1/2 trace-pkpk)
+                              (- (* 1/2 (if reml?
+                                            trace-pkpk
+                                            trace-hik-hik))
                                  (* 1/2
                                     df
                                     (- (* 2 ypkpkpy p-yy)
@@ -336,10 +355,12 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates
-                  (if calc-null?
-                      0
-                      1)))
+           (df (if reml?
+                   (- n-inds n-covariates
+                      (if calc-null?
+                          0
+                          1))
+                   n-inds))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -366,21 +387,31 @@ have closures for that in Scheme."
               (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
               (let* ((trace-hi (blas:dot hi-eval v-temp))
                      (trace-hi-hi (blas:dot hi-hi-eval v-temp))
+                     (trace-hi (- n-inds trace-hi))
+                     (trace-hi-hi (+ (* 2 trace-hi)
+                                     trace-hi-hi
+                                     (- n-inds)))
+                     (trace-hik (/ (- n-inds trace-hi) l))
+                     (trace-hik-hik (/ (+ n-inds
+                                          trace-hi-hi
+                                          (- (* 2 trace-hi)))
+                                       (expt l 2)))
                      (trace-p trace-hi)
                      (trace-pp trace-hi-hi)
-                     (_ (do ((i 0 (1+ i)))
-                            ((= i nc-total))
-                          (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
-                                 (ps-ww (mtx:get pab i index-ww))
-                                 (ps2-ww (mtx:get ppab i index-ww))
-                                 (ps3-ww (mtx:get pppab i index-ww)))
-                            (set! trace-p (- trace-p (/ ps2-ww ps-ww)))
-                            (set! trace-pp
-                                  (+ trace-pp
-                                     (- (/ (expt ps2-ww 2)
-                                           (expt ps-ww 2))
-                                        (/ (* 2 ps3-ww)
-                                           ps-ww)))))))
+                     (_ (when reml?
+                          (do ((i 0 (1+ i)))
+                              ((= i nc-total))
+                            (let* ((index-ww (abindex (1+ i) (1+ i) n-covariates))
+                                   (ps-ww (mtx:get pab i index-ww))
+                                   (ps2-ww (mtx:get ppab i index-ww))
+                                   (ps3-ww (mtx:get pppab i index-ww)))
+                              (set! trace-p (- trace-p (/ ps2-ww ps-ww)))
+                              (set! trace-pp
+                                (+ trace-pp
+                                   (- (/ (expt ps2-ww 2)
+                                         (expt ps-ww 2))
+                                      (/ (* 2 ps3-ww)
+                                         ps-ww))))))))
                      (trace-pk (/ (- df trace-p) l))
                      (trace-pkpk (/
                                   (+ df
@@ -396,15 +427,19 @@ have closures for that in Scheme."
                                     ppp-yy
                                     (- (* 2 pp-yy)))
                                  (expt l 2)))
-                     (dev1 (+ (* -1/2 trace-pk)
+                     (dev1 (+ (* -1/2 (if reml?
+                                          trace-pk
+                                          trace-hik))
                               (/ (* 1/2 df ypkpy)
                                  p-yy)))
-                     (dev2 (- (* 1/2 trace-pkpk)
-                              (* 1/2
-                                 df
-                                 (- (* 2 ypkpkpy p-yy)
-                                    (expt ypkpy 2))
-                                 (/ 1 (expt p-yy 2))))))
+                     (dev2 (- (* 1/2 (if reml?
+                                         trace-pkpk
+                                         trace-hik-hik))
+                              (/ (* 1/2
+                                    df
+                                    (- (* 2 ypkpkpy p-yy)
+                                       (expt ypkpy 2)))
+                                 (expt p-yy 2)))))
                 (values (real-part dev1) (real-part dev2))))))))))))
    ;; LogRL_f
    (lambda (l)
@@ -412,10 +447,12 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (- n-inds n-covariates
-                  (if calc-null?
-                      0
-                      1)))
+           (df (if reml?
+                   (- n-inds n-covariates
+                      (if calc-null?
+                          0
+                          1))
+                   n-inds))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -458,7 +495,7 @@ have closures for that in Scheme."
                                      n-covariates))
                   (result (- c
                              (/ logdet-h 2)
-                             (/ logdet-hiw 2)
+                             (if reml? (/ logdet-hiw 2) 0)
                              (* 1/2 df (log p-yy)))))
              (real-part result))))))))))
 
@@ -466,7 +503,7 @@ have closures for that in Scheme."
   "Calculate lambda for null (when CALC-NULL?) or alternative model.
 (UAB from `calc-uab-alt!' or `calc-uab-null'.)
 Return (LAMBDA LOGF) values."
-  (match (make-log-functions calc-null? n-inds n-covariates uab eval)
+  (match (make-log-functions reml? calc-null? n-inds n-covariates uab eval)
     ((log-rl-dev1 log-rl-dev2 log-rl-dev12 log-rl-f)
      (let* ((lambda-interval (/ (log (/ (l-max) (l-min))) (n-regions)))
             (sign-changes
