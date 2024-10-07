@@ -21,6 +21,7 @@
             vec-replace-nan
             cleanup-mtx
             center-matrix!
+            zero-small-in-matrix!
             eigendecomposition
             eigendecomposition-zeroed
             ;; cblas-dgemm
@@ -130,9 +131,19 @@ Also subtract mean from all the values to 'center' them."
          (mtx:set! mtx i j (mtx:get mtx j i))))
      mtx)))
 
+(define (zero-small-in-matrix! mtx)
+  "Turn all the values small enough into zeros in MTX."
+  (mtx:for-each
+   (lambda (row col val)
+     ;; Should be sane, because double number precision is roughly 15
+     ;; decimal digits.
+     (when (< val 1e-20)
+       (mtx:set! mtx row col 0)))
+   mtx))
 
-(define libopenblas (load-foreign-library "libopenblas.so"))
-;; (define libopenblas (load-foreign-library "/gnu/store/vyglbwdr92nkglxzzbq9anagrby1g3g3-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
+;; (define libopenblas (load-foreign-library "libopenblas.so"))
+(define libopenblas (load-foreign-library "/gnu/store/h1b674352g6ikcz35g3h6pi8ly4sp6lc-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
+
 (define dsyevr-
   (foreign-library-function
    libopenblas "dsyevr_"
@@ -166,8 +177,8 @@ Also subtract mean from all the values to 'center' them."
     (unless (zero? (first (parse-c-struct info (list int))))
       (error 'dsyevr "Failed" (first (parse-c-struct info (list int)))))))
 
-(load-extension "libmgamma.so" "init_eigendecomp")
-;; (load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
+;; (load-extension "libmgamma.so" "init_eigendecomp")
+(load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
 
 (define (eigendecomposition kinship)
   (receive (vals vecs status)
@@ -178,7 +189,8 @@ Also subtract mean from all the values to 'center' them."
           (evectors-mtx (mtx:alloc-square (mtx:rows kinship) vecs)))
       ;; FIXME: Doesn't give the right results yet—some signs are
       ;; inverted. Sigh. --aartaka
-      (eigen:sort! evalues-vec evectors-mtx #:ascending)
+      ;; (error 'evectors-mtx "evectors-mtx" evectors-mtx)
+      ;; (eigen:sort! evalues-vec evectors-mtx #:ascending)
       (mtx:transpose! evectors-mtx #f)
       (values evalues-vec evectors-mtx))))
 
