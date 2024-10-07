@@ -148,10 +148,8 @@
                                      (+ (* ps-aw ps2-bw ps2-ww)
                                         (* ps-bw ps2-aw ps2-ww)
                                         (* ps-aw ps-bw ps3-ww))
-                                     (* ps-ww ps-ww))))))
-                (mtx:set! pppab p index-ab result)))))))
-  ;; TODO
-  #f)
+                                     (expt ps-ww 2))))))
+                (mtx:set! pppab p index-ab result))))))))
 
 (define (n-index n-covariates)
   (floor
