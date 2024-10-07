@@ -137,7 +137,8 @@
                      (result (if (approximately-zero? ps-ww)
                                  ps3-ab
                                  (+ (- ps3-ab
-                                       (/ (* ps-aw ps-bw ps2-ww)
+                                       (/ (* ps-aw ps-bw
+                                             (expt ps2-ww 2))
                                           (expt ps-ww 3)))
                                     (- (/ (+ (* ps-aw ps3-bw)
                                              (* ps-bw ps3-aw)
