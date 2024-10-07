@@ -100,7 +100,7 @@
     (dotimes (i d-size)
       (mtx:row->vec! y i y-row-tmp)
       (receive (lam logl-h0)
-          (calc-lambda-null xt y-row-tmp eval)
+          (calc-lambda-null #:reml xt y-row-tmp eval)
         (receive (g e b)
             (calc-vg-ve-beta lam eval xt y-row-tmp)
           (mtx:set! vg i i g)

@@ -462,7 +462,7 @@ have closures for that in Scheme."
                              (* 1/2 df (log p-yy)))))
              (real-part result))))))))))
 
-(define (calc-lambda calc-null? n-inds n-covariates uab eval)
+(define (calc-lambda reml? calc-null? n-inds n-covariates uab eval)
   "Calculate lambda for null (when CALC-NULL?) or alternative model.
 (UAB from `calc-uab-alt!' or `calc-uab-null'.)
 Return (LAMBDA LOGF) values."
@@ -542,14 +542,14 @@ Return (LAMBDA LOGF) values."
                      #:upper lambda-h
                      #:lower lambda-l))))))))))))
 
-(define (calc-lambda-null utw uty-col eval)
+(define (calc-lambda-null reml? utw uty-col eval)
   "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates)))
     (with-gsl-free
      ((uab (calc-uab-null utw uty-col)))
-     (calc-lambda #t n-inds n-covariates uab eval))))
+     (calc-lambda reml? #t n-inds n-covariates uab eval))))
 
 (define (calc-rlwald l n-inds n-covariates uab eval)
   "Calculate (BETA SE P-WALD) for a given UAB and Lambda."
@@ -626,7 +626,7 @@ Return (LAMBDA LOGF) values."
          (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t))
          (per-snp-params (make-hash-table n-markers)))
     (receive (lam logl-h0)
-        (calc-lambda-null utw uty-col eval)
+        (calc-lambda-null #:reml utw uty-col eval)
       (l-mle-null lam)
       (log-mle-null logl-h0))
     ;; TODO: Rest of the code for the single phenotype case
@@ -639,7 +639,7 @@ Return (LAMBDA LOGF) values."
        (mtx:column->vec! utx i tmp)
        (calc-uab-alt! utw uty-col tmp uab n-covariates)
        (receive (lam logl-alt)
-           (calc-lambda #f n-useful-inds n-covariates uab eval)
+           (calc-lambda #:reml #f n-useful-inds n-covariates uab eval)
          (receive (beta se p-wald)
              (calc-rlwald lam n-useful-inds n-covariates uab eval)
            (hash-set! per-snp-params (car markers)
