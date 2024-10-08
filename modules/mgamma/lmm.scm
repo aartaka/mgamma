@@ -548,7 +548,6 @@ Return (LAMBDA LOGF) values."
                          ;; leave it for later.
                          ((or (= i 100)
                               (eq? approximation #f))))
-                     (gsl:set-error-handler! handler)
                      (if (root:test-interval solver 0 1e-1)
                          (let* ((old-root (root:root solver))
                                 (root (or (root:optimize
