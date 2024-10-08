@@ -516,7 +516,10 @@ Return (LAMBDA LOGF) values."
                                  (if (<= (* dev1-l dev1-h) 0)
                                      (list lambda-l lambda-h)
                                      #f)))
-                             1+ 0))))
+                             1+ 0)))
+            ;; Yes, that's necessary because GSL throws a lot of
+            ;; errors about infinite, misshaped, etc. functions.
+            (handler (gsl:set-error-handler-off!)))
        (if (null? sign-changes)
            (let ((logf-l (log-f (l-min)))
                  (logf-h (log-f (l-max))))
@@ -528,54 +531,51 @@ Return (LAMBDA LOGF) values."
                      (logf +nan.0))
              (cond
               ((null? sign-changes)
+               (gsl:set-error-handler! handler)
                (values lam logf))
               (else
                (match (car sign-changes)
                  ((lambda-l lambda-h)
-                  ;; Yes, that's necessary because GSL throws a lot of
-                  ;; errors about infinite, misshaped, etc. functions.
-                  (let ((handler (gsl:set-error-handler-off!)))
-                    ;; Allocating a new solver every time. Wasteful?
-                    ;; GEMMA uses root:set! instead. --aartaka
-                    (root:call-with
-                     root:+brent-solver+
-                     (lambda (solver)
-                       (do ((i 0 (1+ i))
-                            (approximation (root:iterate! solver)
-                                           (root:iterate! solver)))
-                           ;; GEMMA checks for interval too, but let's
-                           ;; leave it for later.
-                           ((or (= i 100)
-                                (eq? approximation #f))))
-                       (if (root:test-interval solver 0 1e-1)
-                           (let* ((handler (gsl:set-error-handler-off!))
-                                  (old-root (root:root solver))
-                                  (root (or (root:optimize
-                                             root:+newton-polisher+ 100 1e-5
-                                             #:function log-dev1
-                                             #:derivative log-dev2
-                                             #:function+derivative log-dev12
-                                             #:approximate-root old-root)
-                                            old-root))
-                                  (_ (gsl:set-error-handler! handler)))
-                             (if root
-                                 (let* ((l (min (max root
-                                                     (l-min))
-                                                (l-max)))
-                                        (logf-l (log-f l)))
-                                   (cond
-                                    ((and (nan? lam)
-                                          (nan? logf))
-                                     (rec (cdr sign-changes) l logf-l))
-                                    ((< logf logf-l)
-                                     (rec (cdr sign-changes) l logf-l))
-                                    (else
-                                     (rec (cdr sign-changes) lam logf))))
-                                 (rec (cdr sign-changes) lam logf)))
-                           (rec (cdr sign-changes) lam logf)))
-                     #:function log-dev1
-                     #:upper lambda-h
-                     #:lower lambda-l))))))))))))
+                  ;; Allocating a new solver every time. Wasteful?
+                  ;; GEMMA uses root:set! instead. --aartaka
+                  (root:call-with
+                   root:+brent-solver+
+                   (lambda (solver)
+                     (do ((i 0 (1+ i))
+                          (approximation (root:iterate! solver)
+                                         (root:iterate! solver)))
+                         ;; GEMMA checks for interval too, but let's
+                         ;; leave it for later.
+                         ((or (= i 100)
+                              (eq? approximation #f))))
+                     (gsl:set-error-handler! handler)
+                     (if (root:test-interval solver 0 1e-1)
+                         (let* ((old-root (root:root solver))
+                                (root (or (root:optimize
+                                           root:+newton-polisher+ 100 1e-5
+                                           #:function log-dev1
+                                           #:derivative log-dev2
+                                           #:function+derivative log-dev12
+                                           #:approximate-root old-root)
+                                          old-root)))
+                           (if root
+                               (let* ((l (min (max root
+                                                   (l-min))
+                                              (l-max)))
+                                      (logf-l (log-f l)))
+                                 (cond
+                                  ((and (nan? lam)
+                                        (nan? logf))
+                                   (rec (cdr sign-changes) l logf-l))
+                                  ((< logf logf-l)
+                                   (rec (cdr sign-changes) l logf-l))
+                                  (else
+                                   (rec (cdr sign-changes) lam logf))))
+                               (rec (cdr sign-changes) lam logf)))
+                         (rec (cdr sign-changes) lam logf)))
+                   #:function log-dev1
+                   #:upper lambda-h
+                   #:lower lambda-l)))))))))))
 
 (define (calc-lambda-null reml? utw uty-col eval)
   "Calculate lambda/logf for null model (without Uab)."
