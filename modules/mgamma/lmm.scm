@@ -502,7 +502,7 @@ have closures for that in Scheme."
 (UAB from `calc-uab-alt!' or `calc-uab-null'.)
 Return (LAMBDA LOGF) values."
   (match (make-log-functions reml? calc-null? n-inds n-covariates uab eval)
-    ((log-rl-dev1 log-rl-dev2 log-rl-dev12 log-rl-f)
+    ((log-dev1 log-dev2 log-dev12 log-f)
      (let* ((lambda-interval (/ (log (/ (l-max) (l-min))) (n-regions)))
             (sign-changes
              (remove (cut not <>)
@@ -510,16 +510,16 @@ Return (LAMBDA LOGF) values."
                              (lambda (i)
                                (let* ((lambda-l (* (l-min) (exp (* lambda-interval i))))
                                       (lambda-h (* (l-min) (exp (* lambda-interval (1+ i)))))
-                                      (dev1-l (log-rl-dev1 lambda-l))
-                                      (dev1-h (log-rl-dev1 lambda-h)))
+                                      (dev1-l (log-dev1 lambda-l))
+                                      (dev1-h (log-dev1 lambda-h)))
                                  ;; If sign flips b/w dev1-l & dev1-h
                                  (if (<= (* dev1-l dev1-h) 0)
                                      (list lambda-l lambda-h)
                                      #f)))
                              1+ 0))))
        (if (null? sign-changes)
-           (let ((logf-l (log-rl-f (l-min)))
-                 (logf-h (log-rl-f (l-max))))
+           (let ((logf-l (log-f (l-min)))
+                 (logf-h (log-f (l-max))))
              (if (>= logf-l logf-h)
                  (values (l-min) logf-l)
                  (values (l-max) logf-h)))
@@ -552,9 +552,9 @@ Return (LAMBDA LOGF) values."
                                   (old-root (root:root solver))
                                   (root (or (root:optimize
                                              root:+newton-polisher+ 100 1e-5
-                                             #:function log-rl-dev1
-                                             #:derivative log-rl-dev2
-                                             #:function+derivative log-rl-dev12
+                                             #:function log-dev1
+                                             #:derivative log-dev2
+                                             #:function+derivative log-dev12
                                              #:approximate-root old-root)
                                             old-root))
                                   (_ (gsl:set-error-handler! handler)))
@@ -562,7 +562,7 @@ Return (LAMBDA LOGF) values."
                                  (let* ((l (min (max root
                                                      (l-min))
                                                 (l-max)))
-                                        (logf-l (log-rl-f l)))
+                                        (logf-l (log-f l)))
                                    (cond
                                     ((and (nan? lam)
                                           (nan? logf))
@@ -573,7 +573,7 @@ Return (LAMBDA LOGF) values."
                                      (rec (cdr sign-changes) lam logf))))
                                  (rec (cdr sign-changes) lam logf)))
                            (rec (cdr sign-changes) lam logf)))
-                     #:function log-rl-dev1
+                     #:function log-dev1
                      #:upper lambda-h
                      #:lower lambda-l))))))))))))
 
