@@ -660,27 +660,28 @@ Return (LAMBDA LOGF) values."
          (uab (calc-uab-null utw uty-col))
          (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t))
          (per-snp-params (make-hash-table n-markers)))
-    (receive (lam logl-h0)
-        (calc-lambda-null #:reml utw uty-col eval)
-      (l-mle-null lam)
-      (log-mle-null logl-h0))
-    ;; (mtx:with
-    ;;  (b n-phenotypes n-covariates)
-    ;;  (mtx:with
-    ;;   (se-b 1 n-covariates)
-    ;;   (mtx:with-row
-    ;;    (se-beta se-b 0)
-    ;;    (receive (l-mle-null logl-mle-h0)
-    ;;        (calc-lambda-null #f utw uty-col eval)
-    ;;      (receive (vg-mle-null ve-mle-null beta)
-    ;;          (calc-vg-ve-beta (l-mle-null) eval utw uty-col)
-    ;;        ;; TODO: Skipping (se_)beta_mle_null for now.
-    ;;        (receive (l-remle-null log-remle-null-h0)
-    ;;            (calc-lambda-null #:reml utw uty-col eval)
-    ;;          ;; TODO: Skipping (se_)beta_remle_null for now.
-    ;;          (calc-pve eval utw uty-col l-remle-null))))
-    ;;    ;; TODO: Print it?
-    ;;    )))
+    (mtx:with
+     (b n-phenotypes n-covariates)
+     (mtx:with
+      (se-b 1 n-covariates)
+      (mtx:with-row
+       (se-beta se-b 0)
+       (receive (l-mle logl-mle)
+           (calc-lambda-null #f utw uty-col eval)
+         (l-mle-null l-mle)
+         (log-mle-null logl-mle)
+         (receive (vg-mle-null ve-mle-null beta)
+             (calc-vg-ve-beta l-mle-null eval utw uty-col)
+           ;; TODO: Skipping (se_)beta_mle_null for now.
+           (receive (l-remle log-remle)
+               (calc-lambda-null #:reml utw uty-col eval)
+             (l-remle-null l-remle)
+             (log-remle-null log-remle)
+             ;; TODO: Skipping (se_)beta_remle_null for now.
+             ;; (calc-pve eval utw uty-col l-remle-null)
+             )))
+       ;; TODO: Print it?
+       )))
     (vec:with
      (tmp (mtx:rows utx))
      (do ((i 0 (1+ i))

@@ -1,6 +1,7 @@
 (define-module (mgamma config)
   #:export (mapsize
-            n-regions l-min l-max l-mle-null log-mle-null
+            n-regions l-min l-max
+            l-mle-null log-mle-null l-remle-null log-remle-null
             p-nr em-iter em-precision nr-iter nr-precision crt
             +pi+))
 
@@ -12,6 +13,8 @@
 (define l-max (make-parameter 1e+5))
 (define l-mle-null (make-parameter 0))
 (define log-mle-null (make-parameter 0))
+(define l-remle-null (make-parameter 0))
+(define log-remle-null (make-parameter 0))
 
 ;; mvLMM params
 (define p-nr (make-parameter 0.001))
