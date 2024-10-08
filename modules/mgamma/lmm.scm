@@ -650,6 +650,33 @@ Return (LAMBDA LOGF) values."
             ;; TODO: se_beta, Vbeta etc.
             (values vg ve beta))))))))
 
+(define (calc-rl-score l n-inds n-covariates eval uab)
+  (let ((n-index (n-index n-covariates))
+        (df (- n-inds n-covariates 1)))
+    (vec:with
+     (v-temp (vec:length eval) eval)
+     (vec:scale! v-temp l)
+     (vec:add-constant! v-temp 1)
+     (vec:with
+      (hi-eval (vec:length eval) 1)
+      (vec:divide! hi-eval v-temp)
+      (mtx:with
+       (pab (2+ n-covariates) n-index)
+       (calc-pab! uab pab hi-eval n-covariates)
+       (let* ((index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+              (index-xx (abindex (1+ n-covariates) (1+ n-covariates) n-covariates))
+              (index-xy (abindex (2+ n-covariates) (1+ n-covariates) n-covariates))
+              (p-yy (mtx:get pab n-covariates index-yy))
+              (p-xx (mtx:get pab n-covariates index-xx))
+              (p-xy (mtx:get pab n-covariates index-xy))
+              (px-yy (mtx:get pab (1+ n-covariates) index-yy))
+              (beta (/ p-xy p-xx))
+              (se (sqrt (abs (/ 1 (* (/ df px-yy) p-xx)))))
+              (p-score (gsl-cdf-fdist-q
+                        (/ (* n-inds (expt p-xy 2))
+                           (* p-yy p-xx)) 1 df)))
+         (values beta se p-score)))))))
+
 (define (lmm-analyze markers useful-geno useful-inds useful-snps
                      u eval utw uty
                      n-covariates)
@@ -671,7 +698,7 @@ Return (LAMBDA LOGF) values."
          (l-mle-null l-mle)
          (log-mle-null logl-mle)
          (receive (vg-mle-null ve-mle-null beta)
-             (calc-vg-ve-beta l-mle-null eval utw uty-col)
+             (calc-vg-ve-beta (l-mle-null) eval utw uty-col)
            ;; TODO: Skipping (se_)beta_mle_null for now.
            (receive (l-remle log-remle)
                (calc-lambda-null #:reml utw uty-col eval)
@@ -689,16 +716,19 @@ Return (LAMBDA LOGF) values."
          ((= i n-markers))
        (mtx:column->vec! utx i tmp)
        (calc-uab-alt! utw uty-col tmp uab n-covariates)
-       (receive (lam logl-alt)
-           (calc-lambda #:reml #f n-useful-inds n-covariates uab eval)
-         (receive (beta se p-wald)
-             (calc-rlwald lam n-useful-inds n-covariates uab eval)
-           (hash-set! per-snp-params (car markers)
-                      (list
-                       ;; Maf
-                       (hash-ref useful-snps (car markers))
-                       beta se
-                       lam
-                       p-wald
-                       logl-alt))))))
+       (receive (beta se p-score)
+           (calc-rl-score (l-mle-null) n-useful-inds n-covariates eval uab)
+         (receive (lam-alt logl-alt)
+             (calc-lambda #f #f n-useful-inds n-covariates uab eval)
+           (let ((p-lrt (gsl-cdf-chisq-q (* 2 (- logl-alt (log-mle-null))) 1)))
+             (hash-set! per-snp-params (car markers)
+                        (list
+                         ;; Maf
+                         (hash-ref useful-snps (car markers))
+                         beta se
+                         ;; Omitting lambda-remle
+                         lam-alt
+                         ;; Omitting p-wald
+                         p-lrt p-score
+                         logl-alt)))))))
     per-snp-params))
