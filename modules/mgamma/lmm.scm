@@ -579,8 +579,7 @@ Return (LAMBDA LOGF) values."
 (define (calc-lambda-null reml? utw uty-col eval)
   "Calculate lambda/logf for null model (without Uab)."
   (let* ((n-covariates (mtx:columns utw))
-         (n-inds (mtx:rows utw))
-         (n-index (n-index n-covariates)))
+         (n-inds (mtx:rows utw)))
     (with-gsl-free
      ((uab (calc-uab-null utw uty-col)))
      (calc-lambda reml? #t n-inds n-covariates uab eval))))
