@@ -680,7 +680,7 @@ Return (LAMBDA LOGF) values."
                      n-covariates)
   (let* ((n-markers (length markers))
          (n-phenotypes (mtx:columns utw))
-         (n-useful-inds (length useful-inds))
+         (n-useful-inds (mtx:columns useful-geno))
          (uty-col (mtx:column->vec! uty 0))
          (uab (calc-uab-null utw uty-col))
          (utx (blas:gemm u useful-geno #:transpose-a #t #:transpose-b #t))
