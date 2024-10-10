@@ -141,8 +141,8 @@ Also subtract mean from all the values to 'center' them."
        (mtx:set! mtx row col 0)))
    mtx))
 
-;; (define libopenblas (load-foreign-library "libopenblas.so"))
-(define libopenblas (load-foreign-library "/gnu/store/h1b674352g6ikcz35g3h6pi8ly4sp6lc-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
+(define libopenblas (load-foreign-library "libopenblas.so"))
+;; (define libopenblas (load-foreign-library "/gnu/store/h1b674352g6ikcz35g3h6pi8ly4sp6lc-openblas-debug-0.3.20/lib/libopenblas.so" #:global? #t))
 
 (define dsyevr-
   (foreign-library-function
@@ -177,8 +177,8 @@ Also subtract mean from all the values to 'center' them."
     (unless (zero? (first (parse-c-struct info (list int))))
       (error 'dsyevr "Failed" (first (parse-c-struct info (list int)))))))
 
-;; (load-extension "libmgamma.so" "init_eigendecomp")
-(load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
+(load-extension "libmgamma.so" "init_eigendecomp")
+;; (load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
 
 (define (eigendecomposition kinship)
   (receive (vals vecs status)
