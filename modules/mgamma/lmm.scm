@@ -692,14 +692,14 @@ Return (LAMBDA LOGF) values."
       (mtx:with-row
        (se-beta se-b 0)
        (receive (l-mle logl-mle)
-           (calc-lambda-null #f utw uty-col eval)
+           (calc-lambda #f #:null n-useful-inds n-covariates uab eval)
          (l-mle-null l-mle)
          (log-mle-null logl-mle)
          (receive (vg-mle-null ve-mle-null beta)
              (calc-vg-ve-beta (l-mle-null) eval utw uty-col)
            ;; TODO: Skipping (se_)beta_mle_null for now.
            (receive (l-remle log-remle)
-               (calc-lambda-null #:reml utw uty-col eval)
+               (calc-lambda #:reml #:null n-useful-inds n-covariates uab eval)
              (l-remle-null l-remle)
              (log-remle-null log-remle)
              ;; TODO: Skipping (se_)beta_remle_null for now.
