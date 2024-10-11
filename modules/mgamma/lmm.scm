@@ -544,10 +544,9 @@ Return (LAMBDA LOGF) values."
                      (do ((i 0 (1+ i))
                           (approximation (root:iterate! solver)
                                          (root:iterate! solver)))
-                         ;; GEMMA checks for interval too, but let's
-                         ;; leave it for later.
                          ((or (= i 100)
-                              (eq? approximation #f))))
+                              (eq? approximation #f)
+                              (root:test-interval solver 0 1e-1))))
                      (if (root:test-interval solver 0 1e-1)
                          (let* ((old-root (root:root solver))
                                 (root (or (root:optimize
