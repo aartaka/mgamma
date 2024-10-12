@@ -211,7 +211,7 @@
 GEMMA uses FUNC_PARAMS struct and GSL root setters for that, but we
 have closures for that in Scheme."
   (list
-   ;; LogRL_dev1
+   ;; LogRL_dev1/LogL_dev1
    (lambda (l)
      (let ((nc-total (if calc-null?
                          n-covariates
@@ -262,7 +262,7 @@ have closures for that in Scheme."
                               (/ (* 1/2 df y-pkp-y)
                                  p-yy))))
               (real-part result)))))))))
-   ;; LogRL_dev2
+   ;; LogRL_dev2/LogL_dev2
    (lambda (l)
      (let ((nc-total (if calc-null?
                          n-covariates
@@ -347,7 +347,7 @@ have closures for that in Scheme."
                                       (expt ypkpy 2))
                                    (/ 1 (expt p-yy 2))))))
                 (real-part result)))))))))))
-   ;; LogRL_dev12
+   ;; LogRL_dev12/LogL_dev12
    (lambda (l)
      (let ((nc-total (if calc-null?
                          n-covariates
@@ -439,7 +439,7 @@ have closures for that in Scheme."
                                        (expt ypkpy 2)))
                                  (expt p-yy 2)))))
                 (values (real-part dev1) (real-part dev2))))))))))))
-   ;; LogRL_f
+   ;; LogRL_f/LogL_f
    (lambda (l)
      (let ((nc-total (if calc-null?
                          n-covariates
