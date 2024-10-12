@@ -674,9 +674,25 @@ Return (LAMBDA LOGF) values."
                            (* p-yy p-xx)) 1 df)))
          (values beta se p-score)))))))
 
+(define (calc-pve eval utw uty-col l trace-g)
+  (let* ((n-covariates (mtx:columns utw))
+         (n-inds (mtx:rows utw))
+         (n-index (n-index n-covariates)))
+    (with-gsl-free
+     ((uab (calc-uab-null utw uty-col)))
+     (match (make-log-functions #t #t n-inds n-covariates uab eval)
+       ((_ logrl-dev2 . _)
+        (let* ((se (sqrt (abs (/ -1 (logrl-dev2 l)))))
+               (pve (/ (* trace-g l)
+                       (1+ (* trace-g l))))
+               (pve-se (* trace-g
+                          (/ 1 (expt (1+ (* trace-g l)) 2))
+                          se)))
+          (values pve pve-se)))))))
+
 (define (lmm-analyze markers useful-geno useful-inds useful-snps
                      u eval utw uty
-                     n-covariates)
+                     n-covariates trace-g)
   (let* ((n-markers (length markers))
          (n-phenotypes (mtx:columns utw))
          (n-useful-inds (mtx:columns useful-geno))
@@ -702,8 +718,10 @@ Return (LAMBDA LOGF) values."
              (l-remle-null l-remle)
              (log-remle-null log-remle)
              ;; TODO: Skipping (se_)beta_remle_null for now.
-             ;; (calc-pve eval utw uty-col l-remle-null)
-             )))
+             (receive (p p-se)
+                 (calc-pve eval utw uty-col l-remle-null trace-g)
+               (pve p)
+               (pve-se p-se)))))
        ;; TODO: Print it?
        )))
     (vec:with
