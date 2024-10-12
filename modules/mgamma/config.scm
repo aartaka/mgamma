@@ -2,6 +2,7 @@
   #:export (mapsize
             n-regions l-min l-max
             l-mle-null log-mle-null l-remle-null log-remle-null
+            pve pve-se
             p-nr em-iter em-precision nr-iter nr-precision crt
             +pi+))
 
@@ -15,6 +16,8 @@
 (define log-mle-null (make-parameter 0))
 (define l-remle-null (make-parameter 0))
 (define log-remle-null (make-parameter 0))
+(define pve (make-parameter 0))
+(define pve-se (make-parameter 0))
 
 ;; mvLMM params
 (define p-nr (make-parameter 0.001))
