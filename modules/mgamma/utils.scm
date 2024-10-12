@@ -199,15 +199,17 @@ Also subtract mean from all the values to 'center' them."
 Return two values:
 - EVALUES-VEC
 - EVECTORS-MTX"
-  (receive (evalues-vec evectors-mtx)
-      (eigendecomposition kinship)
-    (vec:for-each
-     (lambda (i val)
-       (when (< val 1e-10)
+  (let ((trace-g 0))
+    (receive (evalues-vec evectors-mtx)
+        (eigendecomposition kinship)
+      (vec:for-each
+       (lambda (i val)
          ;; pylmm uses 1e-6 instead
-         (vec:set! evalues-vec i 0)))
-     evalues-vec)
-    (values evalues-vec evectors-mtx)))
+         (when (< val 1e-10)
+           (vec:set! evalues-vec i 0)
+           (inc! trace-g (vec:get evalues-vec i))))
+       evalues-vec)
+      (values evalues-vec evectors-mtx trace-g))))
 
 ;; (define %cblas-dgemm
 ;;   (foreign-library-function

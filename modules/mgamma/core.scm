@@ -114,7 +114,7 @@ numbers, run multivariate LMM on the data instead of univariate."
     (cleanup-mtx useful-geno)
     (calc-covariate-pheno y w useful-pheno cvt useful-individuals)
     (center-matrix! useful-kinship)
-    (receive (eval u)
+    (receive (eval u trace-g)
         (eigendecomposition-zeroed useful-kinship)
       (let* ((u
               ;; Necessary because GSL/LAPACKE don't always provide

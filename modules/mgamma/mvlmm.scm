@@ -23,7 +23,7 @@
      (mtx:with
       (ve-hi d-size d-size 0)
       (let ((logdet-ve 0))
-        (receive (dl ul)
+        (receive (dl ul trace-g)
             (eigendecomposition-zeroed ve-temp)
           (do ((i 0 (1+ i)))
               ((= i d-size))
@@ -46,7 +46,7 @@
           (vec:free dl))
         (let* ((vg-ve-hi (blas:gemm vg ve-hi))
                (lam (blas:gemm ve-hi vg-ve-hi)))
-          (receive (dl ul)
+          (receive (dl ul trace-g)
               (eigendecomposition-zeroed lam)
             (vec:for-each
              (lambda (idx val)
