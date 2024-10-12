@@ -563,9 +563,9 @@ Return (LAMBDA LOGF) values."
                                            #:approximate-root old-root)
                                           old-root)))
                            (if root
-                               (let* ((l (min (max root
-                                                   (l-min))
-                                              (l-max)))
+                               (let* ((l (min (l-max)
+                                              (max root
+                                                   (l-min))))
                                       (logf-l (log-f l)))
                                  (cond
                                   ((and (nan? lam)
