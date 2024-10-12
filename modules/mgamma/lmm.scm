@@ -241,7 +241,7 @@ have closures for that in Scheme."
             (ppab (2+ n-covariates) n-index)
             (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
             (let* ((trace-hi (blas:dot hi-eval v-temp))
-                   (trace-hik (/ (- df trace-hi) l))
+                   (trace-hik (/ (- n-inds trace-hi) l))
                    (trace-p
                     (do ((i 0 (1+ i))
                          (trace-p
@@ -259,7 +259,7 @@ have closures for that in Scheme."
                    (pp-yy (mtx:get ppab nc-total index-ww))
                    (y-pkp-y (/ (- p-yy pp-yy) l))
                    (result (+ (* -1/2 (if reml? trace-pk trace-hik))
-                              (/ (* 1/2 df y-pkp-y)
+                              (/ (* 1/2 (if reml? df n-inds) y-pkp-y)
                                  p-yy))))
               (real-part result)))))))))
    ;; LogRL_dev2/LogL_dev2
@@ -342,7 +342,7 @@ have closures for that in Scheme."
                                            trace-pkpk
                                            trace-hik-hik))
                                 (* 1/2
-                                   df
+                                   (if reml? df n-inds)
                                    (- (* 2 ypkpkpy p-yy)
                                       (expt ypkpy 2))
                                    (/ 1 (expt p-yy 2))))))
@@ -428,13 +428,13 @@ have closures for that in Scheme."
                      (dev1 (+ (* -1/2 (if reml?
                                           trace-pk
                                           trace-hik))
-                              (/ (* 1/2 df ypkpy)
+                              (/ (* 1/2 (if reml? df n-inds) ypkpy)
                                  p-yy)))
                      (dev2 (- (* 1/2 (if reml?
                                          trace-pkpk
                                          trace-hik-hik))
                               (/ (* 1/2
-                                    df
+                                    (if reml? df n-inds)
                                     (- (* 2 ypkpkpy p-yy)
                                        (expt ypkpy 2)))
                                  (expt p-yy 2)))))
@@ -484,17 +484,23 @@ have closures for that in Scheme."
                                    logdet-hiw)))
                   (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
                   (p-yy (mtx:get pab nc-total index-ww))
-                  (c (* 1/2
-                        df
-                        (- (log df)
-                           (log (* 2 +pi+))
-                           1)))
+                  (c (if reml?
+                         (* 1/2
+                            df
+                            (- (log df)
+                               (log (* 2 +pi+))
+                               1))
+                         (* 1/2
+                            n-inds
+                            (- (log n-inds)
+                               (log (* 2 +pi+))
+                               1))))
                   (index-yy (abindex (2+ n-covariates) (2+ n-covariates)
                                      n-covariates))
                   (result (- c
                              (/ logdet-h 2)
                              (if reml? (/ logdet-hiw 2) 0)
-                             (* 1/2 df (log p-yy)))))
+                             (* 1/2 (if reml? df n-inds) (log p-yy)))))
              (real-part result))))))))))
 
 (define (calc-lambda reml? calc-null? n-inds n-covariates uab eval)
