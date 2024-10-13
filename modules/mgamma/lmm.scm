@@ -528,6 +528,16 @@ Return (LAMBDA LOGF) values."
              (cond
               ((null? sign-changes)
                (gsl:set-error-handler! handler)
+               (let ((logf-l (log-f (l-min)))
+                     (logf-h (log-f (l-max)))
+                     (lam lam)
+                     (logf logf))
+                 (when (> logf-l logf)
+                   (set! lam (l-min))
+                   (set! logf logf-l))
+                 (when (> logf-h logf)
+                   (set! lam (l-max))
+                   (set! logf logf-h)))
                (values lam logf))
               (else
                (match (car sign-changes)
