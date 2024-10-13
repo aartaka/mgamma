@@ -300,12 +300,6 @@ have closures for that in Scheme."
               (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
               (let* ((trace-hi (blas:dot hi-eval v-temp))
                      (trace-hi-hi (blas:dot hi-hi-eval v-temp))
-                     (trace-hi (- n-inds trace-hi))
-                     (trace-hi-hi (if reml?
-                                      trace-hi-hi
-                                      (+ (* 2 trace-hi)
-                                         trace-hi-hi
-                                         (- n-inds))))
                      (trace-hik-hik (/
                                      (+ n-inds
                                         trace-hi-hi
@@ -385,10 +379,6 @@ have closures for that in Scheme."
               (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
               (let* ((trace-hi (blas:dot hi-eval v-temp))
                      (trace-hi-hi (blas:dot hi-hi-eval v-temp))
-                     (trace-hi (- n-inds trace-hi))
-                     (trace-hi-hi (+ (* 2 trace-hi)
-                                     trace-hi-hi
-                                     (- n-inds)))
                      (trace-hik (/ (- n-inds trace-hi) l))
                      (trace-hik-hik (/ (+ n-inds
                                           trace-hi-hi
