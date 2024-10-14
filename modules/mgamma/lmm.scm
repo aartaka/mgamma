@@ -217,12 +217,11 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (if reml?
-                   n-inds
-                   (- n-inds n-covariates
-                      (if calc-null?
-                          0
-                          1)))))
+           ;; REML-only
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1))))
        (vec:with
         (hi-eval (vec:length eval) 1)
         (vec:with
