@@ -242,6 +242,7 @@ have closures for that in Scheme."
             (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
             (let* ((trace-hi (blas:dot hi-eval v-temp))
                    (trace-hik (/ (- n-inds trace-hi) l))
+                   ;; REML-only
                    (trace-p
                     (do ((i 0 (1+ i))
                          (trace-p
@@ -268,12 +269,11 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (if reml?
-                   (- n-inds n-covariates
-                      (if calc-null?
-                          0
-                          1))
-                   n-inds))
+           ;; REML-only
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -305,6 +305,7 @@ have closures for that in Scheme."
                                         trace-hi-hi
                                         (- (* 2 trace-hi)))
                                      (expt l 2)))
+                     ;; REML-only
                      (trace-p trace-hi)
                      (trace-pp trace-hi-hi)
                      (_ (when reml?
@@ -347,12 +348,11 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (if reml?
-                   (- n-inds n-covariates
-                      (if calc-null?
-                          0
-                          1))
-                   n-inds))
+           ;; REML-only
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
@@ -384,6 +384,7 @@ have closures for that in Scheme."
                                           trace-hi-hi
                                           (- (* 2 trace-hi)))
                                        (expt l 2)))
+                     ;; REML-only
                      (trace-p trace-hi)
                      (trace-pp trace-hi-hi)
                      (_ (when reml?
@@ -400,6 +401,7 @@ have closures for that in Scheme."
                                          (expt ps-ww 2))
                                       (/ (* 2 ps3-ww)
                                          ps-ww))))))))
+                     ;; REML-only
                      (trace-pk (/ (- df trace-p) l))
                      (trace-pkpk (/
                                   (+ df
@@ -435,12 +437,11 @@ have closures for that in Scheme."
                          n-covariates
                          (1+ n-covariates)))
            (n-index (n-index n-covariates))
-           (df (if reml?
-                   (- n-inds n-covariates
-                      (if calc-null?
-                          0
-                          1))
-                   n-inds))
+           ;; REML-only
+           (df (- n-inds n-covariates
+                  (if calc-null?
+                      0
+                      1)))
            (eval-len (vec:length eval)))
        (vec:with
         (hi-eval eval-len 1)
