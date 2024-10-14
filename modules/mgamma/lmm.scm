@@ -554,28 +554,42 @@ Return (LAMBDA LOGF) values."
                               (eq? approximation #f)
                               (root:test-interval solver 0 1e-1))))
                      (if (root:test-interval solver 0 1e-1)
-                         (let* ((old-root (root:root solver))
-                                (root (or (root:optimize
-                                           root:+newton-polisher+ 100 1e-5
-                                           #:function log-dev1
-                                           #:derivative log-dev2
-                                           #:function+derivative log-dev12
-                                           #:approximate-root old-root)
-                                          old-root)))
-                           (if root
-                               (let* ((l (min (l-max)
-                                              (max root
-                                                   (l-min))))
-                                      (logf-l (log-f l)))
-                                 (cond
-                                  ((and (nan? lam)
-                                        (nan? logf))
-                                   (rec (cdr sign-changes) l logf-l))
-                                  ((< logf logf-l)
-                                   (rec (cdr sign-changes) l logf-l))
-                                  (else
-                                   (rec (cdr sign-changes) lam logf))))
-                               (rec (cdr sign-changes) lam logf)))
+                         (let* ((old-root (root:root solver)))
+                           (root:with
+                            (polisher root:+newton-polisher+
+                                      #:function log-dev1
+                                      #:derivative log-dev2
+                                      #:function+derivative log-dev12
+                                      #:approximate-root old-root)
+                            (receive (approximation prev-approximation)
+                                (do ((i 0 (1+ i))
+                                     (approximation (root:iterate! polisher)
+                                                    (root:iterate! polisher))
+                                     (prev-approximation #f approximation))
+                                    ((or (= i 100)
+                                         (eq? approximation #f)
+                                         (> approximation (l-max))
+                                         (< approximation (l-min))
+                                         (and prev-approximation
+                                              (root:test-delta
+                                               approximation prev-approximation
+                                               0 1e-5)))
+                                     (values approximation prev-approximation)))
+                              (let ((root prev-approximation))
+                                (if root
+                                    (let* ((l (min (l-max)
+                                                   (max root
+                                                        (l-min))))
+                                           (logf-l (log-f l)))
+                                      (cond
+                                       ((and (nan? lam)
+                                             (nan? logf))
+                                        (rec (cdr sign-changes) l logf-l))
+                                       ((< logf logf-l)
+                                        (rec (cdr sign-changes) l logf-l))
+                                       (else
+                                        (rec (cdr sign-changes) lam logf))))
+                                    (rec (cdr sign-changes) lam logf))))))
                          (rec (cdr sign-changes) lam logf)))
                    #:function log-dev1
                    #:upper lambda-h
