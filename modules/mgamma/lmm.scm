@@ -537,8 +537,8 @@ Return (LAMBDA LOGF) values."
                    (set! logf logf-l))
                  (when (> logf-h logf)
                    (set! lam (l-max))
-                   (set! logf logf-h)))
-               (values lam logf))
+                   (set! logf logf-h))
+                 (values lam logf)))
               (else
                (match (car sign-changes)
                  ((lambda-l lambda-h)
