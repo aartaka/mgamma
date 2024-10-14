@@ -472,8 +472,8 @@ have closures for that in Scheme."
                                          (- (log (mtx:get iab i index-ww)))))))
                                   ((= i nc-total)
                                    logdet-hiw)))
-                  (index-ww (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
-                  (p-yy (mtx:get pab nc-total index-ww))
+                  (index-yy (abindex (2+ n-covariates) (2+ n-covariates) n-covariates))
+                  (p-yy (mtx:get pab nc-total index-yy))
                   (c (if reml?
                          (* 1/2
                             df
@@ -485,10 +485,8 @@ have closures for that in Scheme."
                             (- (log n-inds)
                                (log (* 2 +pi+))
                                1))))
-                  (index-yy (abindex (2+ n-covariates) (2+ n-covariates)
-                                     n-covariates))
                   (result (- c
-                             (/ logdet-h 2)
+                             (* 1/2 logdet-h)
                              (if reml? (/ logdet-hiw 2) 0)
                              (* 1/2 (if reml? df n-inds) (log p-yy)))))
              (real-part result))))))))))
