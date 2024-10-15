@@ -454,8 +454,6 @@ have closures for that in Scheme."
           (calc-pab! uab pab hi-eval n-covariates)
           (mtx:with
            (iab (2+ n-covariates) n-index)
-           (vec:fill! v-temp 1.0)
-           (calc-pab! uab iab v-temp n-covariates)
            (let* ((logdet-h
                    (do ((i 0 (1+ i))
                         (logdet-h 0
@@ -463,6 +461,14 @@ have closures for that in Scheme."
                                      (log (abs (vec:get v-temp i))))))
                        ((= i eval-len)
                         logdet-h)))
+                  ;; This is looking weird because logdet-h should be
+                  ;; calculate with old v-temp before it's modified
+                  ;; here. It's also because I don't want to introduce
+                  ;; yet another layer of nesting to this already
+                  ;; horrible function.
+                  (_ (begin
+                       (vec:fill! v-temp 1.0)
+                       (calc-pab! uab iab v-temp n-covariates)))
                   (logdet-hiw (do ((i 0 (1+ i))
                                    (logdet-hiw
                                     0
