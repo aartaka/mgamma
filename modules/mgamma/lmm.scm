@@ -704,7 +704,7 @@ Return (LAMBDA LOGF) values."
          (n-index (n-index n-covariates)))
     (with-gsl-free
      ((uab (calc-uab-null utw uty-col)))
-     (match (make-log-functions #t #t n-inds n-covariates uab eval)
+     (match (make-log-functions #:reml #:null n-inds n-covariates uab eval)
        ((_ logrl-dev2 . _)
         (let* ((se (sqrt (abs (/ -1 (logrl-dev2 l)))))
                (pve (/ (* trace-g l)
