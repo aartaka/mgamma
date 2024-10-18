@@ -185,9 +185,10 @@
     uab))
 
 ;; uab is reused/modified from the result of calc-uab-null
-(define (calc-uab-alt! utw uty-col utx-col uab n-covariates)
+(define (calc-uab-alt! utw uty-col utx-col uab)
   "Calculate Uab for alternative model."
   (let* ((n-inds (mtx:rows utw))
+         (n-covariates (mtx:columns utw))
          (tmp (vec:alloc (mtx:rows uab))))
     (do ((b 1 (1+ b)))
         ((= b (+ n-covariates 3)))
@@ -753,7 +754,7 @@ Return (LAMBDA LOGF) values."
           (markers markers (cdr markers)))
          ((= i n-markers))
        (mtx:column->vec! utx i tmp)
-       (calc-uab-alt! utw uty-col tmp uab n-covariates)
+       (calc-uab-alt! utw uty-col tmp uab)
        (receive (beta se p-score)
            (calc-rl-score (l-mle-null) n-useful-inds n-covariates eval uab)
          (receive (lam-alt logl-alt)
