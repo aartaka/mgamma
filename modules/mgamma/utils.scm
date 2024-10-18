@@ -206,10 +206,10 @@ Return two values:
        (lambda (i val)
          ;; pylmm uses 1e-6 instead
          (when (< val 1e-10)
-           (vec:set! evalues-vec i 0)
-           (inc! trace-g (vec:get evalues-vec i))))
+           (vec:set! evalues-vec i 0))
+         (inc! trace-g (vec:get evalues-vec i)))
        evalues-vec)
-      (values evalues-vec evectors-mtx trace-g))))
+      (values evalues-vec evectors-mtx (/ trace-g (vec:length evalues-vec))))))
 
 ;; (define %cblas-dgemm
 ;;   (foreign-library-function
