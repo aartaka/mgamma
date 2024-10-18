@@ -744,10 +744,9 @@ Return (LAMBDA LOGF) values."
              ;; TODO: Skipping (se_)beta_remle_null for now.
              (receive (p p-se)
                  (calc-pve eval utw uty-col (l-remle-null) trace-g)
+               ;; TODO: Print it?
                (pve p)
-               (pve-se p-se)))))
-       ;; TODO: Print it?
-       )))
+               (pve-se p-se))))))))
     (vec:with
      (tmp (mtx:rows utx))
      (do ((i 0 (1+ i))
