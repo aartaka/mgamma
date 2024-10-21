@@ -64,14 +64,15 @@ or, in Scheme REPL (more verbose, but allows playing with data interactively).
 
 ``` scheme
 (use-modules ((mgamma core) #:prefix mgamma:))
-(use-modules (srfi srfi-1))
-(define geno+markers (mgamma:geno.txt->lmdb "/path/to/mgamma/example/BXD_geno.txt" "/tmp/mgamma-geno/"))
-(define geno-mtx (first geno+markers))
-(define markers (second geno+markers))
-(define pheno-mtx (pheno.txt->pheno-mtx "/path/to/mgamma/example/BXD_pheno.txt"))
-(define kinship (kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
-(define params (analyze geno-mtx geno-markers kinship #f pheno-mtx #f))
-(snp-params->assoc.txt params "BXD.assoc.txt")
+(use-modules ((mgamma io) #:prefix io:))
+(define-values (geno-mtx geno-markers)
+  (io:geno.txt->lmdb "/path/to/mgamma/example/BXD_geno.txt" "/tmp/mgamma-geno/"))
+(define pheno-mtx
+  (io:pheno.txt->pheno-mtx "/path/to/mgamma/example/BXD_pheno.txt"))
+(define kinship
+  (mgamma:kinship-mtx geno-mtx geno-markers (useful-snps geno-mtx geno-markers pheno-mtx #f)))
+(define params (mgamma:analyze geno-mtx geno-markers kinship #f pheno-mtx '(0) #f))
+(io:snp-params->assoc.txt params "BXD.assoc.txt")
 ```
 
 ## LOCO
