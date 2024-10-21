@@ -196,9 +196,10 @@ Also subtract mean from all the values to 'center' them."
 
 (define (eigendecomposition-zeroed kinship)
   "Eigendecomposition, but zero the values below threshold.
-Return two values:
+Return three values:
 - EVALUES-VEC
-- EVECTORS-MTX"
+- EVECTORS-MTX
+- TRACE-G (sum of nonzero eigenvalues)."
   (let ((trace-g 0))
     (receive (evalues-vec evectors-mtx)
         (eigendecomposition kinship)
@@ -273,6 +274,7 @@ and copying a ROWSxCOLS chunk."
         (mtx:set! mtx mtx-row mtx-col (mtx:get submatrix row col))))))
 
 (define (subvector vec start len)
+  "Return a LEN-long subvector of VEC from START."
   (let ((new (vec:alloc len)))
     (do ((idx 0 (1+ idx))
          (vec-idx start (1+ vec-idx)))
@@ -280,12 +282,14 @@ and copying a ROWSxCOLS chunk."
       (vec:set! new idx (vec:get vec vec-idx)))
     new))
 (define (subvector->vec! sub vec start len)
+  "Put a SUBvector (as per `subvector') into VEC at START."
   (do ((idx 0 (1+ idx))
        (vec-idx start))
       ((= idx len))
     (vec:set! vec vec-idx (vec:get sub idx))))
 
 (define (gsl-free . things)
+  "Generic deallocation for GSL matrices and vectors."
   (for-each (lambda (thing)
               (if (mtx:mtx? thing)
                   (mtx:free thing)

@@ -51,6 +51,7 @@
    #:return-type double))
 
 (define (calc-pab! uab pab hi-eval n-covariates)
+  "CalcPab"
   (do ((p 0 (1+ p))) ;; rows phenotypes + covariates
       ((> p (1+ n-covariates)))
     (do ((a (1+ p) (1+ a))) ;; cols in p+1..rest
@@ -74,6 +75,7 @@
                                  (- ps-ab (/ (* ps-aw ps-bw) ps-ww)))))
                 (mtx:set! pab p index-ab result))))))))
 (define (calc-ppab! uab pab ppab hi-hi-eval n-covariates)
+  "CalcPPab"
   (do ((p 0 (1+ p))) ;; rows phenotypes + covariates
       ((> p (1+ n-covariates)))
     (do ((a (1+ p) (1+ a))) ;; cols in p+1..rest
@@ -108,6 +110,7 @@
                                      ps-ww)))))
                 (mtx:set! ppab p index-ab result))))))))
 (define (calc-pppab! uab pab ppab pppab hi-hi-hi-eval n-covariates)
+  "CalcPPPab"
   (do ((p 0 (1+ p))) ;; rows phenotypes + covariates
       ((> p (1+ n-covariates)))
     (do ((a (1+ p) (1+ a))) ;; cols in p+1..rest
@@ -152,13 +155,14 @@
                 (mtx:set! pppab p index-ab result))))))))
 
 (define (n-index n-covariates)
+  "Helper for n_index calculation GEMMA duplicates."
   (floor
    (* (+ n-covariates 3)
       (+ n-covariates 2)
       1/2)))
 
 (define (calc-uab-null utw uty)
-  "Calculate UAB for null/H0 model."
+  "Calculate Uab for null/H0 model."
   (let* ((n-inds (mtx:rows utw))
          (n-covariates (mtx:columns utw))
          (uab (mtx:alloc n-inds (n-index n-covariates)))
@@ -186,7 +190,7 @@
 
 ;; uab is reused/modified from the result of calc-uab-null
 (define (calc-uab-alt! utw uty-col utx-col uab)
-  "Calculate Uab for alternative model."
+  "Calculate UAB for alternative model."
   (let* ((n-inds (mtx:rows utw))
          (n-covariates (mtx:columns utw))
          (tmp (vec:alloc (mtx:rows uab))))
@@ -205,8 +209,6 @@
     (vec:free tmp)
     uab))
 
-;; This function exists for the sole reason of closing over UAB et
-;; al. while passing the generated functions to GSL root solvers.
 (define (make-log-functions reml? calc-null? n-inds n-covariates uab eval)
   "Used to create functions closed over UAB, EVAL etc.
 GEMMA uses FUNC_PARAMS struct and GSL root setters for that, but we
@@ -500,7 +502,7 @@ have closures for that in Scheme."
 
 (define (calc-lambda reml? calc-null? n-inds n-covariates uab eval)
   "Calculate lambda for null (when CALC-NULL?) or alternative model.
-(UAB from `calc-uab-alt!' or `calc-uab-null'.)
+(UAB should come from `calc-uab-alt!' or `calc-uab-null'.)
 Return (LAMBDA LOGF) values."
   (match (make-log-functions reml? calc-null? n-inds n-covariates uab eval)
     ((log-dev1 log-dev2 log-dev12 log-f)
@@ -637,6 +639,7 @@ Return (LAMBDA LOGF) values."
          (values beta se p-wald)))))))
 
 (define (calc-vg-ve-beta l eval utw uty-col)
+  "Calculate null model (VG VE BETA) values."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates))
@@ -673,6 +676,7 @@ Return (LAMBDA LOGF) values."
             (values vg ve beta))))))))
 
 (define (calc-rl-score l n-inds n-covariates eval uab)
+  "CalcRLScore"
   (let ((n-index (n-index n-covariates))
         (df (- n-inds n-covariates 1)))
     (vec:with
@@ -700,6 +704,7 @@ Return (LAMBDA LOGF) values."
          (values beta se p-score)))))))
 
 (define (calc-pve eval utw uty-col l trace-g)
+  "Calculate (PVE PVE-SE) estimates for null model."
   (let* ((n-covariates (mtx:columns utw))
          (n-inds (mtx:rows utw))
          (n-index (n-index n-covariates)))
@@ -718,6 +723,20 @@ Return (LAMBDA LOGF) values."
 (define (lmm-analyze markers useful-geno useful-inds useful-snps
                      u eval utw uty
                      n-covariates trace-g)
+  "Produce a hash table with model parameters for provided SNPs.
+MARKERS is a list of marker names.
+USEFUL-INDS is a list of booleans (whether the individual is
+useful/indicator or not).
+USEFUL-SNPS is a hash-table from marker name (as per MARKERS) to MAF
+value.
+U and EVAL are eigenvectors and eigenvalues respectively.
+TRACE-G is the sum of positive eigenvalues from EVAL.
+UTW and UTY are products of U multiplication by W (covariates) and
+Y (phenotypes).
+Some of these are redundant. Oh well.
+
+The returned table maps marker names to (MAF BETA SE LAM-ALT P-LRT
+P-SCORE LOGL-ALT) list."
   (let* ((n-markers (length markers))
          (n-phenotypes (mtx:columns utw))
          (n-useful-inds (mtx:columns useful-geno))

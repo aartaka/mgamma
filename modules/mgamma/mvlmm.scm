@@ -1597,6 +1597,7 @@
    #:return-type double))
 
 (define-parameterized (pcrt d-size p-value crt-a crt-b crt-c)
+  "PCRT"
   (let* ((p-crt 0)
          (q d-size)
          (chisq (gsl-cdf-chisq-qinv p-value d-size))
@@ -1609,6 +1610,10 @@
     (gsl-cdf-chisq-q chisq-crt d-size)))
 
 (define-parameterized (mvlmm-analyze markers useful-geno useful-snps u eval utw uty)
+  "Produce a table of parameters for MvLMM model.
+All parameters as per `lmm-analyze'.
+The returned table maps marker name to (V-BETA P-WALT MAF P-LRT
+P-SCORE V-VG V-VE V-VBETA) list."
   (let* ((n-size (mtx:rows uty))
          (d-size (mtx:columns uty))
          (c-size (mtx:columns utw))
