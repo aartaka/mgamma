@@ -159,6 +159,8 @@ mgamma gwa [--map-size 10000000] [--kinship kinship.(txt|mdb)] [--pheno-nums 1,2
                  (cvt-mtx (if (option-ref options 'covar #f)
                               (covariates.txt->cvt-mtx (option-ref options 'covar #f))
                               #f)))
+            (unless (string-suffix? "data.mdb" kin)
+              (copy-file kin (string-append (dirname kin) "/data.mdb")))
             (snp-params->assoc.txt
              (analyze geno-mtx markers (cond
                                         (kin-txt? (cxx.txt->kinship kin))
