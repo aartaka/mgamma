@@ -5,6 +5,33 @@ This is a work-in-progress attempt to reproduce some of
 
 IMPORTANT: WIP. YMMV.
 
+# Getting Started
+
+Clone the repository:
+
+``` sh
+git clone https://github.com/aartaka/mgamma
+```
+
+Build Mgamma see guix.scm for the example build sequence. Dependencies are:
+- Guile dependencies:
+  - Guile itself
+  - [guile-gsl](https://github.com/aartaka/guile-gsl)
+  - [guile-lapack](https://github.com/aartaka/guile-lapack)
+  - [guile-lmdb](https://github.com/aartaka/guile-lmdb)
+  - guile-json
+  - Mgamma itself! (modules/ subdirectory)
+- Non-Guile dependencies:
+  - OpenBLAS
+  - GSL
+  - to build extension/ lib:
+    - libguile.h
+    - GCC
+    - GNU Make
+    - pkg-config
+
+The installation is simple: put bin/mgamma script in the PATH and ensure that `GUILE_LOAD_PATH` has all the dependencies when running Mgamma.
+
 # Usage
 
 Get help and example usage:
