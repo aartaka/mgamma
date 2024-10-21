@@ -130,7 +130,7 @@ object."
 
 (define (geno.txt->genotypes-mtx geno.txt)
   "Convert GENO.TXT-FILE to a proper genotype matrix
-Return a (MATRIX MARKER-NAMES) list."
+Return a (MATRIX MARKER-NAMES UNUSED) values."
   (let* ((lines (read-separated-lines geno.txt))
          (mtx (mtx:alloc (length lines)
                          ;; The first 3 lines: marker, chr, and chr.
@@ -146,7 +146,7 @@ Return a (MATRIX MARKER-NAMES) list."
         (let ((ind (string->number (first inds))))
           (when ind
             (mtx:set! mtx row col ind)))))
-    (values mtx (map first lines))))
+    (values mtx (map first lines) #f)))
 
 (define (pointer=? ptr1 ptr2 size)
   (bytevector=? (pointer->bytevector ptr1 size)
@@ -190,9 +190,9 @@ doubles."
      #:mapsize (mapsize))
     (when tmp-vec
       (vec:free tmp-vec))
-    (list (or mtx (mtx:alloc 0 0 0))
-          (reverse! markers)
-          meta)))
+    (values (or mtx (mtx:alloc 0 0 0))
+            (reverse! markers)
+            meta)))
 
 (define (kinship->lmdb kinship-mtx lmdb-dir)
   "Dump KINSHIP-MTX to an LMDB residing in LMDB-DIR."
