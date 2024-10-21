@@ -31,12 +31,14 @@
             subvector->vec!
             gsl-free))
 
+;; Increase/increment VAR by STEP (defaults to 1.)
 (define-syntax inc!
   (syntax-rules ()
     ((_ var)
      (set! var (1+ var)))
     ((_ var step)
      (set! var (+ step var)))))
+;; Decrease/decrement VAR by STEP (defaults to 1.)
 (define-syntax dec!
   (syntax-rules ()
     ((_ var)
@@ -45,11 +47,13 @@
      (set! var (- var step )))))
 
 (define (2+ number)
+  "A frequent patter of adding 2 to NUMBER."
   (+ number 2))
 
 (define (approximately-zero? x)
   (< (abs x) 1e-10))
 
+;; Iterate UPPER-BOUND times, run BODY w/ VAR bound to iteration int.
 (define-syntax dotimes
   (syntax-rules ()
     ((_ (var upper-bound . result-forms) body ...)
@@ -58,6 +62,8 @@
          ((= var bound)
           . result-forms)
        body ...))))
+;; Iterate from LOWER-BOUND (inclusive) to UPPER-BOUND (exclusive.)
+;; Binds VAR to every successive integer in sequence.
 (define-syntax dorange
   (syntax-rules ()
     ((_ (var lower-bound upper-bound) body ...)
@@ -240,6 +246,9 @@ Return three values:
 ;;    (mtx:data b) (third (mtx:parts b))
 ;;    beta (mtx:data c) (third (mtx:parts c))))
 
+;; Macro to ensure CLEANUP forms run after FORM.
+;; Return value is that of the FORM.
+;; Inspired by Common Lisp's unwind-protect.
 (define-syntax-rule (with-cleanup form cleanup ...)
   (dynamic-wind
     (lambda ()
@@ -296,6 +305,8 @@ and copying a ROWSxCOLS chunk."
                   (vec:free thing)))
             things))
 
+;; Bind every VAR to INIT and `gsl-free' it after BODY terminates.
+;; Returns the value of BODY last form.
 (define-syntax-rule (with-gsl-free ((var init) ...) body ...)
   (let* ((var init) ...)
     (with-cleanup
