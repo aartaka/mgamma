@@ -127,7 +127,7 @@ numbers, run multivariate LMM on the data instead of univariate."
             (lmm-analyze markers useful-geno useful-individuals useful-snps u eval utw uty n-covariates trace-g)
             (mvlmm-analyze markers useful-geno useful-snps u eval utw uty))))))
 
-;; (define-values (geno-mtx geno-markers)
+;; (define-values (geno-mtx geno-markers meta)
 ;;   (geno.txt->genotypes-mtx "/home/aartaka/git/GEMMA/example/BXD_geno.txt"))
 ;; (define pheno-mtx (pheno.txt->pheno-mtx "/home/aartaka/git/GEMMA/example/BXD_pheno.txt"))
 ;; (define cvt-mtx (covariates.txt->cvt-mtx "/home/aartaka/git/GEMMA/example/mouse_hs1940_snps_anno.txt"))
