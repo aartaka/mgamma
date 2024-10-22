@@ -47,26 +47,6 @@
                         (("libopenblas.so")
                          openblas))
                        #t)))
-                  (add-before 'build 'build-libmgamma
-                    (lambda* (#:key inputs outputs #:allow-other-keys)
-                      (let ((extdir (string-append (assoc-ref outputs "out")
-                                                   "/lib/guile/3.0/extensions")))
-                        (invoke "make" "-C" "extension"
-                                (string-append "CC="
-                                               (assoc-ref inputs "gcc-toolchain")
-                                               "/bin/gcc")
-                                "libmgamma.so")
-                        (mkdir-p extdir)
-                        (copy-file "extension/libmgamma.so"
-                                   (string-append extdir "/libmgamma.so")))))
-                  (add-before 'build 'substitute-libmgamma
-                    (lambda* (#:key outputs #:allow-other-keys)
-                      (substitute*
-                          '("modules/mgamma/utils.scm")
-                        (("load-extension \"libmgamma.so\"")
-                         ;; Bump the version when updating
-                         (format #f "load-extension \"~a/lib/guile/3.0/extensions/libmgamma.so\""
-                                 (assoc-ref outputs "out"))))))
                   (add-after 'build 'make-bin
                     (lambda* (#:key inputs outputs #:allow-other-keys)
                       (let* ((bin (string-append (assoc-ref outputs "out")

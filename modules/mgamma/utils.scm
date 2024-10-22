@@ -183,9 +183,6 @@ Also subtract mean from all the values to 'center' them."
     (unless (zero? (first (parse-c-struct info (list int))))
       (error 'dsyevr "Failed" (first (parse-c-struct info (list int)))))))
 
-(load-extension "libmgamma.so" "init_eigendecomp")
-;; (load-extension "/home/aartaka/git/mgamma/extension/libmgamma.so" "init_eigendecomp")
-
 (define (eigendecomposition kinship)
   (let* ((evalues-vec (vec:alloc (mtx:rows kinship)))
          (evectors-mtx (mtx:alloc (mtx:rows kinship) (mtx:rows kinship)))
