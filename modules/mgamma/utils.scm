@@ -71,6 +71,54 @@
          ((= var upper-bound))
        body ...))))
 
+;; Macro to ensure CLEANUP forms run after FORM.
+;; Return value is that of the FORM.
+;; Inspired by Common Lisp's unwind-protect.
+(define-syntax-rule (with-cleanup form cleanup ...)
+  (dynamic-wind
+    (lambda ()
+      #t)
+    (lambda ()
+      form)
+    (lambda ()
+      cleanup ...)))
+
+(define (gsl-free . things)
+  "Generic deallocation for GSL matrices and vectors."
+  (for-each (lambda (thing)
+              (if (mtx:mtx? thing)
+                  (mtx:free thing)
+                  (vec:free thing)))
+            things))
+
+;; Bind every VAR to INIT and `gsl-free' it after BODY terminates.
+;; Returns the value of BODY last form.
+(define-syntax-rule (with-gsl-free ((var init) ...) body ...)
+  (let* ((var init) ...)
+    (with-cleanup
+     (begin body ...)
+     (gsl-free var ...))))
+
+;; Define a NAMEd procedure and PARAMETER-NAMEd parameter
+;; variable. Proceeds with running BODY with ARGS when PARAMETER-NAMEd
+;; variable is #false. When PARAMETER-NAME is `parameterize'd to a new
+;; procedure, call this procedure on ARGS instead. Useful to override
+;; a procedure (like replacing the results for testing or providing
+;; shortcut data for long-running computation.)
+(define-syntax define-parameterized
+  (syntax-rules ()
+    ((_ ((name parameter-name) . args) body ...)
+     (begin
+       (define parameter-name (make-parameter #f))
+       (define (name . rest)
+         (apply (or (parameter-name)
+                    (lambda args body ...))
+                rest))))
+    ((_ (name . args) body ...)
+     (define (name . args) body ...))
+    ((_ name value)
+     (define name (make-parameter value)))))
+
 (define (vec-mean vec)
   "Mean value of the VEC, with all the NaNs ignored."
   (let ((sum 0)
@@ -268,18 +316,6 @@ Return three values:
 ;;    (mtx:data b) (third (mtx:parts b))
 ;;    beta (mtx:data c) (third (mtx:parts c))))
 
-;; Macro to ensure CLEANUP forms run after FORM.
-;; Return value is that of the FORM.
-;; Inspired by Common Lisp's unwind-protect.
-(define-syntax-rule (with-cleanup form cleanup ...)
-  (dynamic-wind
-    (lambda ()
-      #t)
-    (lambda ()
-      form)
-    (lambda ()
-      cleanup ...)))
-
 (define (submatrix mtx start-row start-col rows cols)
   "Get a ROWSxCOLS submatrix of MTX, left upper corner at START-ROW, START-COL."
   (let ((new (mtx:alloc rows cols 0)))
@@ -318,39 +354,3 @@ and copying a ROWSxCOLS chunk."
        (vec-idx start))
       ((= idx len))
     (vec:set! vec vec-idx (vec:get sub idx))))
-
-(define (gsl-free . things)
-  "Generic deallocation for GSL matrices and vectors."
-  (for-each (lambda (thing)
-              (if (mtx:mtx? thing)
-                  (mtx:free thing)
-                  (vec:free thing)))
-            things))
-
-;; Bind every VAR to INIT and `gsl-free' it after BODY terminates.
-;; Returns the value of BODY last form.
-(define-syntax-rule (with-gsl-free ((var init) ...) body ...)
-  (let* ((var init) ...)
-    (with-cleanup
-     (begin body ...)
-     (gsl-free var ...))))
-
-;; Define a NAMEd procedure and PARAMETER-NAMEd parameter
-;; variable. Proceeds with running BODY with ARGS when PARAMETER-NAMEd
-;; variable is #false. When PARAMETER-NAME is `parameterize'd to a new
-;; procedure, call this procedure on ARGS instead. Useful to override
-;; a procedure (like replacing the results for testing or providing
-;; shortcut data for long-running computation.)
-(define-syntax define-parameterized
-  (syntax-rules ()
-    ((_ ((name parameter-name) . args) body ...)
-     (begin
-       (define parameter-name (make-parameter #f))
-       (define (name . rest)
-         (apply (or (parameter-name)
-                    (lambda args body ...))
-                rest))))
-    ((_ (name . args) body ...)
-     (define (name . args) body ...))
-    ((_ name value)
-     (define name (make-parameter value)))))
