@@ -209,7 +209,7 @@ Also subtract mean from all the values to 'center' them."
    #:return-type void))
 
 (define (dsyevr jobz range uplo n a lda vl vu il iu abstol m w z ldz isuppz work lwork iwork liwork)
-  (let  ((int->ptr
+  (let* ((int->ptr
           (lambda (i)
             (assert (integer? i))
             (make-c-struct (list int) (list i))))
@@ -221,15 +221,17 @@ Also subtract mean from all the values to 'center' them."
           (lambda (f)
             (assert (real? f))
             (make-c-struct (list double) (list f))))
-         (info (make-c-struct (list int) '(0))))
+         (info (make-c-struct (list int) '(0)))
+         (parse-info (lambda ()
+                       (first (parse-c-struct info (list int))))))
     (dsyevr- (char->ptr jobz) (char->ptr range) (char->ptr uplo)
              (int->ptr n) a (int->ptr lda)
              (inexact->ptr vl) (inexact->ptr vu)
              (int->ptr il) (int->ptr iu)
              (inexact->ptr abstol) m w z
              (int->ptr ldz) isuppz work lwork iwork liwork info)
-    (unless (zero? (first (parse-c-struct info (list int))))
-      (error 'dsyevr "Failed" (first (parse-c-struct info (list int)))))))
+    (unless (zero? (parse-info))
+      (error 'dsyevr "Failed" (parse-info)))))
 
 (define (eigendecomposition kinship)
   (let* ((evalues-vec (vec:alloc (mtx:rows kinship)))
